@@ -6,7 +6,7 @@ from SPARQLWrapper import SPARQLWrapper, JSON
 import json
 from tqdm import tqdm
 import os
-from pararel_utils import MPARAREL_FOLDER, TUPLES_FOLDER, OBJECT_KEY, OBJECT_URI
+from pararel_utils import MPARAREL_FOLDER, TUPLES_FOLDER, OBJECT_KEY, OBJECT_QCODE
 
 SPARQL_URL = "https://query.wikidata.org/sparql"
 
@@ -45,7 +45,7 @@ for lang in tqdm(os.listdir(tuples_folder), desc="Languages"):
             for line in f:
                 data = json.loads(line)
                 data.pop(OBJECT_KEY)
-                data[OBJECT_KEY] = get_aliases(data[OBJECT_URI], lang)
+                data[OBJECT_KEY] = get_aliases(data[OBJECT_QCODE], lang)
                 lines.append(json.dumps(data))
         with open(os.path.join(output_folder, lang, relation_filename), "w") as outfile:
             outfile.write("\n".join(lines))

@@ -16,8 +16,9 @@ from tqdm import tqdm
 import wandb
 
 OBJECT_KEY = "obj_label"
-OBJECT_URI = "obj_uri"
+OBJECT_QCODE = "obj_uri"
 SUBJECT_KEY = "sub_label"
+SUBJECT_QCODE = "subj_uri"
 PATTERN_KEY = "pattern"
 MPARAREL_FOLDER = "mpararel/data/mpararel_reviewed"
 PATTERNS_FOLDER = "patterns"
@@ -82,19 +83,22 @@ def get_mpararel_templates(lang, relation_filename, mask_lm=False):
     return final_templates
 
 
-def get_mpararel_subject_object(lang, relation_filename):
-    subject_object = [
-        (e[SUBJECT_KEY], e[OBJECT_KEY])
+def get_mpararel_subject_object(
+    lang, relation_filename, tuples_folder=TUPLES_FOLDER, only_tuple=True
+):
+    tuples_data = [
+        e
         for e in _get_mpararel_items(
-            os.path.join(MPARAREL_FOLDER, TUPLES_FOLDER, lang, relation_filename)
+            os.path.join(MPARAREL_FOLDER, tuples_folder, lang, relation_filename)
         )
     ]
-    counts = collections.Counter([s for s, _ in subject_object])
+    counts = collections.Counter([data[SUBJECT_KEY] for data in tuples_data])
     unique_subjects = []
-    for subject, object_ in subject_object:
-        if counts[subject] > 1:
+    for data in tuples_data:
+        if counts[data[SUBJECT_KEY]] > 1:
             continue
-        unique_subjects.append((subject, object_))
+        out = (data[SUBJECT_KEY], data[OBJECT_KEY]) if only_tuple else data
+        unique_subjects.append(out)
     return unique_subjects
 
 
