@@ -56,9 +56,7 @@ def main(args):
 
 if __name__ == "__main__":
     parser = argparse.ArgumentParser()
-    parser.add_argument(
-        "--hf_dataset_name", type=str, default="coastalcph/mpararel_with_aliases"
-    )
+    parser.add_argument("--hf_dataset_name", type=str, default="coastalcph/mpararel")
     parser.add_argument("--use_aliases_folder", action="store_true")
     args = parser.parse_args()
 
