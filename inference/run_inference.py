@@ -248,7 +248,7 @@ def main(args):
     model.eval()
 
     print("Loading dataset")
-    dataset = load_dataset(args.dataset_name)
+    dataset = load_dataset(args.dataset_name)["train"]
 
     print("Running inference")
     outputs = inference(dataset, tokenizer, model, args)
