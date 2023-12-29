@@ -1,8 +1,10 @@
 import argparse
+import collections
 import os
 
-from datasets import Dataset
 import wandb
+from constants import LANGUAGES
+from datasets import Dataset
 from pararel_utils import (
     MPARAREL_FOLDER,
     PATTERNS_FOLDER,
@@ -13,6 +15,40 @@ from pararel_utils import (
     get_mpararel_templates,
 )
 from tqdm import tqdm
+
+
+def ensure_crosslingual(ds):
+    ds = ds.filter(lambda ex: ex["language"] in LANGUAGES)
+    ds_t0 = ds.filter(lambda ex: ex["template_id"] == 0)
+
+    lang_relation_to_sub = collections.defaultdict(set)
+    for ex in ds_t0:
+        lang_relation_to_sub[f"{ex['language']}_{ex['relation']}"].add(
+            ex[SUBJECT_QCODE]
+        )
+    relation_to_lang_to_subjs = collections.defaultdict(dict)
+    for k, rel_sub in lang_relation_to_sub.items():
+        lang, rel = k.split("_")
+        relation_to_lang_to_subjs[rel][lang] = rel_sub
+
+    rel_to_shared_subjs = {}
+    for rel in relation_to_lang_to_subjs.keys():
+        shared_subjs = None
+        for lang, subs in relation_to_lang_to_subjs[rel].items():
+            if not shared_subjs:
+                shared_subjs = subs
+            else:
+                shared_subjs = shared_subjs.intersection(subs)
+        rel_to_shared_subjs[rel] = shared_subjs
+
+    for rel in relation_to_lang_to_subjs.keys():
+        print(rel)
+        for lang, objs in relation_to_lang_to_subjs[rel].items():
+            print(lang, "{:.01%}".format(len(rel_to_shared_subjs[rel]) / len(objs)))
+
+    return ds.filter(
+        lambda ex: ex[SUBJECT_QCODE] in rel_to_shared_subjs[ex["relation"]]
+    )
 
 
 def main(args):
@@ -51,12 +87,16 @@ def main(args):
                         for template_id in range(len(templates))
                     ]
                 )
-    Dataset.from_list(dataset).push_to_hub(args.hf_dataset_name)
+    ds = Dataset.from_list(dataset)
+    ds = ensure_crosslingual(ds)
+    ds.push_to_hub(args.hf_dataset_name)
 
 
 if __name__ == "__main__":
     parser = argparse.ArgumentParser()
-    parser.add_argument("--hf_dataset_name", type=str, default="coastalcph/mpararel")
+    parser.add_argument(
+        "--hf_dataset_name", type=str, default="coastalcph/xlingual_mpararel"
+    )
     parser.add_argument("--use_aliases_folder", action="store_true")
     args = parser.parse_args()
 
