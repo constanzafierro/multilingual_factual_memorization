@@ -35,10 +35,10 @@ def main(args):
                 dataset.append(
                     [
                         {
-                            "id": f"{lang}_{relation}_{tuples_data[SUBJECT_QCODE]}_{template_id}",
+                            "id": f"{lang}_{relation}_{tuple_[SUBJECT_QCODE]}_{template_id}",
                             "language": lang,
                             "relation": relation,
-                            "template": templates["template_id"],
+                            "template": templates[template_id],
                             "template_id": template_id,
                             "query": templates[template_id].replace(
                                 "[X]", tuple_[SUBJECT_KEY]
@@ -48,7 +48,7 @@ def main(args):
                         for template_id in enumerate(templates)
                     ]
                 )
-    DatasetDict({"test": dataset}).push_to_hub(args.hf_dataset_name)
+    DatasetDict({"train": dataset}).push_to_hub(args.hf_dataset_name)
 
 
 if __name__ == "__main__":

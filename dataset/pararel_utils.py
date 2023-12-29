@@ -18,7 +18,7 @@ import wandb
 OBJECT_KEY = "obj_label"
 OBJECT_QCODE = "obj_uri"
 SUBJECT_KEY = "sub_label"
-SUBJECT_QCODE = "subj_uri"
+SUBJECT_QCODE = "sub_uri"
 PATTERN_KEY = "pattern"
 MPARAREL_FOLDER = "mpararel/data/mpararel_reviewed"
 PATTERNS_FOLDER = "patterns"
