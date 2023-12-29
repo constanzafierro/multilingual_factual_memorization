@@ -167,10 +167,19 @@ def get_generation_config(tokenizer):
     )
 
 
-def inference(dataset, tokenizer, model, args):
+def write_outputs(outputs, experiment_dir):
+    print("Writing outputs")
+    for key in outputs:
+        with open(os.path.join(experiment_dir, key + ".json"), "a") as outfile:
+            for item in outputs[key]:
+                outfile.write(json.dumps(item))
+                outfile.write("\n")
+
+
+def inference(dataset, tokenizer, model, args, experiment_dir):
     config = get_generation_config(tokenizer)
     outputs = {key: [] for key in ["raw_predictions", "predictions"]}
-    for example in tqdm(dataset):
+    for example_index, example in enumerate(tqdm(dataset)):
         example_id = example["id"]
         query = example["query"]
         with torch.no_grad():
@@ -211,7 +220,10 @@ def inference(dataset, tokenizer, model, args):
                 ],
             }
         )
-    return outputs
+        if example_index > 0 and example_index % 2000 == 0:
+            write_outputs(outputs, experiment_dir)
+            outputs = {key: [] for key in ["raw_predictions", "predictions"]}
+    write_outputs(outputs, experiment_dir)
 
 
 def main(args):
@@ -219,7 +231,7 @@ def main(args):
         args.exp_name, args.model_name_or_path.replace("/", "-")
     )
     experiment_dir = os.path.join(args.output_dir, experiment_name)
-    os.makedirs(experiment_dir, exist_ok=True)
+    os.makedirs(experiment_dir)
 
     print("Loading model")
     use_fast = True
@@ -251,15 +263,9 @@ def main(args):
     dataset = load_dataset(args.dataset_name)["train"]
 
     print("Running inference")
-    outputs = inference(dataset, tokenizer, model, args)
+    inference(dataset, tokenizer, model, args, experiment_dir)
 
-    print("Writing outputs")
-    for key in outputs:
-        with open(os.path.join(experiment_dir, key + ".json"), "w") as outfile:
-            for i, item in enumerate(outputs[key]):
-                outfile.write(json.dumps(item))
-                if i != len(outputs[key]) - 1:
-                    outfile.write("\n")
+    print("Writing config")
     with open(os.path.join(experiment_dir, "args.json"), "w") as f:
         json.dump(args.__dict__, f, indent=2)
 
