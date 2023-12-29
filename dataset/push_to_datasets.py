@@ -1,7 +1,7 @@
 import argparse
 import os
 
-from datasets import DatasetDict
+from datasets import Dataset
 import wandb
 from pararel_utils import (
     MPARAREL_FOLDER,
@@ -33,22 +33,20 @@ def main(args):
             relation = relation_filename.replace(".jsonl", "")
             for tuple_ in tuples_data:
                 dataset.append(
-                    [
-                        {
-                            "id": f"{lang}_{relation}_{tuple_[SUBJECT_QCODE]}_{template_id}",
-                            "language": lang,
-                            "relation": relation,
-                            "template": templates[template_id],
-                            "template_id": template_id,
-                            "query": templates[template_id].replace(
-                                "[X]", tuple_[SUBJECT_KEY]
-                            ),
-                            **tuple_,
-                        }
-                        for template_id in enumerate(templates)
-                    ]
+                    {
+                        "id": f"{lang}_{relation}_{tuple_[SUBJECT_QCODE]}_{template_id}",
+                        "language": lang,
+                        "relation": relation,
+                        "template": templates[template_id],
+                        "template_id": template_id,
+                        "query": templates[template_id].replace(
+                            "[X]", tuple_[SUBJECT_KEY]
+                        ),
+                        **tuple_,
+                    }
+                    for template_id in range(len(templates))
                 )
-    DatasetDict({"train": dataset}).push_to_hub(args.hf_dataset_name)
+    Dataset.from_list(dataset).push_to_hub(args.hf_dataset_name)
 
 
 if __name__ == "__main__":
