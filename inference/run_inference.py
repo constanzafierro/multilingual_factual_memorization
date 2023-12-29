@@ -11,14 +11,16 @@ from transformers import (
     AutoModelForCausalLM,
     AutoModelForSeq2SeqLM,
     AutoTokenizer,
+    BloomTokenizerFast,
     GenerationConfig,
     LlamaTokenizer,
     LlamaTokenizerFast,
-    XGLMTokenizerFast,
-    BloomTokenizerFast,
     PreTrainedTokenizerFast,
     T5TokenizerFast,
+    XGLMTokenizerFast,
 )
+
+from dataset.pararel_utils import SUBJECT_QCODE
 
 device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
 NUM_BEAMS = 1
@@ -265,6 +267,16 @@ def main(args):
         langs = set(args.only_languages)
         dataset = dataset.filter(lambda ex: ex["language"] in langs)
 
+    if args.topk_popular_subjects != -1:
+        popular_subjs = set()
+        for relation in os.listdir(args.subjects_count_folder):
+            with open(os.path.join(args.subjects_count_folder, relation)) as f:
+                qcodes_and_counts = json.load(f)
+                popular_subjs.extend(
+                    [i for i, _ in qcodes_and_counts[: args.topk_popular_subjects]]
+                )
+        dataset = dataset.filter(lambda ex: ex[SUBJECT_QCODE] in popular_subjs)
+
     print("Running inference")
     inference(dataset, tokenizer, model, args, experiment_dir)
 
@@ -313,6 +325,18 @@ if __name__ == "__main__":
     )
     parser.add_argument(
         "--cache_dir",
+        type=str,
+        default=None,
+        help="",
+    )
+    parser.add_argument(
+        "--topk_popular_subjects",
+        type=int,
+        default=-1,
+        help="",
+    )
+    parser.add_argument(
+        "--subjects_count_folder",
         type=str,
         default=None,
         help="",
