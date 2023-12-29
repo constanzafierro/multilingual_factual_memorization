@@ -18,6 +18,9 @@ from tqdm import tqdm
 def main(args):
     dataset = []
     patterns_path = os.path.join(MPARAREL_FOLDER, PATTERNS_FOLDER)
+    tuples_folder = TUPLES_FOLDER
+    if args.use_aliases_folder:
+        tuples_folder += "_with_aliases"
     for lang in tqdm(os.listdir(patterns_path), desc="Languages"):
         os.makedirs(os.path.join(patterns_path, lang), exist_ok=True)
         for relation_filename in tqdm(
@@ -27,7 +30,7 @@ def main(args):
             tuples_data = get_mpararel_subject_object(
                 lang,
                 relation_filename,
-                tuples_folder=TUPLES_FOLDER + "_with_aliases",
+                tuples_folder=tuples_folder,
                 only_tuple=False,
             )
             relation = relation_filename.replace(".jsonl", "")
@@ -56,6 +59,7 @@ if __name__ == "__main__":
     parser.add_argument(
         "--hf_dataset_name", type=str, default="coastalcph/mpararel_with_aliases"
     )
+    parser.add_argument("--use_aliases_folder", action="store_true")
     args = parser.parse_args()
 
     wandb.init(project="push_mpararel_hf")
