@@ -261,6 +261,9 @@ def main(args):
 
     print("Loading dataset")
     dataset = load_dataset(args.dataset_name)["train"]
+    if args.only_languages:
+        langs = set(args.only_languages)
+        dataset = dataset.filter(lambda ex: ex["language"] in langs)
 
     print("Running inference")
     inference(dataset, tokenizer, model, args, experiment_dir)
@@ -276,6 +279,12 @@ if __name__ == "__main__":
         "--dataset_name",
         type=str,
         default="coastalcph/mpararel_with_aliases",
+        help="",
+    )
+    parser.add_argument(
+        "--only_languages",
+        nargs="+",
+        default=[],
         help="",
     )
     parser.add_argument(
