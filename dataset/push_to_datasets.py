@@ -32,19 +32,21 @@ def main(args):
             )
             relation = relation_filename.replace(".jsonl", "")
             for tuple_ in tuples_data:
-                dataset.append(
-                    {
-                        "id": f"{lang}_{relation}_{tuple_[SUBJECT_QCODE]}_{template_id}",
-                        "language": lang,
-                        "relation": relation,
-                        "template": templates[template_id],
-                        "template_id": template_id,
-                        "query": templates[template_id].replace(
-                            "[X]", tuple_[SUBJECT_KEY]
-                        ),
-                        **tuple_,
-                    }
-                    for template_id in range(len(templates))
+                dataset.extend(
+                    [
+                        {
+                            "id": f"{lang}_{relation}_{tuple_[SUBJECT_QCODE]}_{template_id}",
+                            "language": lang,
+                            "relation": relation,
+                            "template": templates[template_id],
+                            "template_id": template_id,
+                            "query": templates[template_id].replace(
+                                "[X]", tuple_[SUBJECT_KEY]
+                            ),
+                            **tuple_,
+                        }
+                        for template_id in range(len(templates))
+                    ]
                 )
     Dataset.from_list(dataset).push_to_hub(args.hf_dataset_name)
 
