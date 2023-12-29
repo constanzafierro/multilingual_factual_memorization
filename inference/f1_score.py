@@ -2,7 +2,6 @@
 
 import re
 import string
-import sys
 from collections import Counter
 
 import pandas as pd
@@ -28,6 +27,7 @@ def normalize_answer(s):
 
 
 def f1_score(prediction, ground_truth):
+    # TODO: replace \\n for \n?
     gt = normalize_answer(ground_truth)
     prediction_tokens = normalize_answer(prediction)[: len(gt)].split()
     ground_truth_tokens = gt.split()

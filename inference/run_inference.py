@@ -13,13 +13,15 @@ from transformers import (
     AutoTokenizer,
     GenerationConfig,
     LlamaTokenizer,
+    LlamaTokenizerFast,
+    XGLMTokenizerFast,
+    BloomTokenizerFast,
     PreTrainedTokenizerFast,
     T5TokenizerFast,
 )
 
 device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
 NUM_BEAMS = 1
-MAX_ANSWER_LENGTH = 10
 DEFAULT_TEMPLATE = "query_in_response"
 DEFAULT_INSTRUCTION = "Complete the fact in as few words as possible"
 
@@ -56,44 +58,73 @@ def prepare_prompt(query, model_name_or_path, instruction, template=None):
         return "{}\n{}".format(instruction, query)
     elif "chat" in model_name_or_path:
         return "[INST] {}: {} [/INST] ".format(instruction, query)
+    elif "mt5" in model_name_or_path:
+        return query + " <extra_id_0> "
     else:
         return query
 
 
-get_sequence = {
-    # Ignore the prompt.
-    LlamaTokenizer: lambda seq, input_ids: seq[input_ids.shape[1] :].cpu().tolist(),
-    PreTrainedTokenizerFast: lambda seq, input_ids: seq[input_ids.shape[1] :]
-    .cpu()
-    .tolist(),
-    # Ignore the BOS token.
-    T5TokenizerFast: lambda seq, _: seq.cpu().tolist()[1:],
-}
-ids_to_ignore = {
-    # Ignore BOS, EOS.
-    LlamaTokenizer: [1, 2],
-    # Ignore EOS.
-    T5TokenizerFast: [1],
-    # Ignore EOS.
-    PreTrainedTokenizerFast: [11],
-}
-# Token id of a full stop when not at the beggining of a word so it could be
-# different than tokenizer.tokens_to_ids(tokenizer.tokenize('.')).
-full_stop = {LlamaTokenizer: 29889, T5TokenizerFast: 5, PreTrainedTokenizerFast: 25}
+def remove_bos(tokenizer, seq, input_ids):
+    def ignore_prompt(seq, input_ids):
+        return seq[input_ids.shape[1] :].cpu().tolist()
+
+    tok_to_func = {
+        # Ignore the prompt.
+        LlamaTokenizer: ignore_prompt,
+        LlamaTokenizerFast: ignore_prompt,
+        XGLMTokenizerFast: ignore_prompt,
+        BloomTokenizerFast: ignore_prompt,
+        PreTrainedTokenizerFast: lambda seq, input_ids: seq[input_ids.shape[1] :]
+        .cpu()
+        .tolist(),
+        # Ignore the BOS (pad) token.
+        T5TokenizerFast: lambda seq, _: seq.cpu().tolist()[1:],
+    }
+    return tok_to_func[type(tokenizer)](seq, input_ids)
+
+
+def get_ids_to_ignore(tokenizer):
+    ids_to_ignore = {
+        LlamaTokenizer: [tokenizer.bos_token_id, tokenizer.eos_token_id],
+        LlamaTokenizerFast: [tokenizer.bos_token_id, tokenizer.eos_token_id],
+        # Ignore EOS.
+        T5TokenizerFast: [
+            tokenizer.eos_token_id,
+            *[
+                tokenizer.convert_tokens_to_ids(tokenizer.tokenize(f"<extra_id_{i}>"))[
+                    0
+                ]
+                for i in range(100)
+            ],
+        ],
+        # Ignore EOS.
+        PreTrainedTokenizerFast: [tokenizer.eos_token_id],
+        XGLMTokenizerFast: [tokenizer.eos_token_id],
+        BloomTokenizerFast: [],
+    }
+    return ids_to_ignore[type(tokenizer)]
+
+
+def get_full_stop(tokenizer):
+    # Token id of a full stop when not at the beggining of a word so it could be
+    # different than tokenizer.tokens_to_ids(tokenizer.tokenize('.')).
+    ids = tokenizer.convert_tokens_to_ids(tokenizer.tokenize("a."))
+    return ids[-1]
 
 
 def get_scores(model_output, input_ids, prompt, query, tokenizer):
     """Assumes num_beam=1. Gets the token scores for every token that is not BOS, EOS or fullstop,
     gets the first non-the token score and computes pplx."""
-    sequence = get_sequence[type(tokenizer)](model_output["sequences"][0], input_ids)
+    sequence = remove_bos(tokenizer, model_output["sequences"][0], input_ids)
     assert len(sequence) == len(model_output["scores"])
     token_scores = []
     trimmed_sequence = []
+    ids_to_ignore = set(get_ids_to_ignore(tokenizer))
     for idx, score in zip(sequence, model_output["scores"]):
-        if idx not in ids_to_ignore[type(tokenizer)]:
+        if idx not in ids_to_ignore:
             token_scores.append(torch.softmax(score, 1)[:, idx].cpu().item())
             trimmed_sequence.append(idx)
-    if trimmed_sequence and trimmed_sequence[-1] == full_stop[type(tokenizer)]:
+    if trimmed_sequence and trimmed_sequence[-1] == get_full_stop(tokenizer):
         token_scores = token_scores[:-1]
         trimmed_sequence = trimmed_sequence[:-1]
     answer = tokenizer.decode(trimmed_sequence).strip()
@@ -217,7 +248,7 @@ def main(args):
     model.eval()
 
     print("Loading dataset")
-    dataset = load_dataset("coastalcph/mpararel_with_aliases")
+    dataset = load_dataset(args.dataset_name)
 
     print("Running inference")
     outputs = inference(dataset, tokenizer, model, args)
@@ -235,6 +266,12 @@ def main(args):
 
 if __name__ == "__main__":
     parser = argparse.ArgumentParser(description="Inference")
+    parser.add_argument(
+        "--dataset_name",
+        type=str,
+        default="coastalcph/mpararel_with_aliases",
+        help="",
+    )
     parser.add_argument(
         "--template",
         type=str,
