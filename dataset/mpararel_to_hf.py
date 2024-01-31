@@ -61,7 +61,11 @@ def filter_trivial_examples(ds):
                 True
         return False
 
-    return ds.filter(lambda ex: not is_trivial_example(ex))
+    filtered = ds.filter(lambda ex: not is_trivial_example(ex))
+    if wandb.run is not None:
+        wandb.run.summary["size_before_filter"] = len(ds)
+        wandb.run.summary["size_after_filter"] = len(filtered)
+    return filtered
 
 
 def main(args):
@@ -105,8 +109,8 @@ def main(args):
                     ]
                 )
     ds = Dataset.from_list(dataset)
-    ds = ensure_crosslingual(ds)
     ds = filter_trivial_examples(ds)
+    ds = ensure_crosslingual(ds)
     ds.push_to_hub(args.hf_dataset_name)
 
 
