@@ -17,7 +17,7 @@ from pararel_utils import (
 from tqdm import tqdm
 
 
-def ensure_crosslingual(ds):
+def ensure_crosslingual(ds, args):
     ds = ds.filter(lambda ex: ex["language"] in args.languages)
     ds_t0 = ds.filter(lambda ex: ex["template_id"] == 0)
 
@@ -110,7 +110,13 @@ def main(args):
                 )
     ds = Dataset.from_list(dataset)
     ds = filter_trivial_examples(ds)
-    ds = ensure_crosslingual(ds)
+    ds = ensure_crosslingual(ds, args)
+    print("Counts per language")
+    print(
+        collections.Counter(
+            ds.filter(lambda ex: ex["template_id"] == 0)["train"]["language"]
+        )
+    )
     ds.push_to_hub(args.hf_dataset_name)
 
 
