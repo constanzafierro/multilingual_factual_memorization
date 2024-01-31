@@ -112,11 +112,7 @@ def main(args):
     ds = filter_trivial_examples(ds)
     ds = ensure_crosslingual(ds, args)
     print("Counts per language")
-    print(
-        collections.Counter(
-            ds.filter(lambda ex: ex["template_id"] == 0)["train"]["language"]
-        )
-    )
+    print(collections.Counter(ds.filter(lambda ex: ex["template_id"] == 0)["language"]))
     ds.push_to_hub(args.hf_dataset_name)
 
 
