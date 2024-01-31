@@ -62,7 +62,11 @@ def main(args):
         for relation_filename in tqdm(
             os.listdir(os.path.join(patterns_path, lang)), desc="Relations"
         ):
-            templates = get_mpararel_templates(lang, relation_filename)
+            templates = []
+            for template in get_mpararel_templates(lang, relation_filename):
+                assert template.endswith("[Y]")
+                template = template.replace("[Y]", "").strip()
+                templates.append(template)
             tuples_data = get_mpararel_subject_object(
                 lang,
                 relation_filename,

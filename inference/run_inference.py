@@ -343,7 +343,7 @@ if __name__ == "__main__":
     )
     args = parser.parse_args()
 
-    project_name = "lm_mutability_preds_eval"
+    project_name = "xlingual_inference"
     wandb.init(
         project=project_name,
         name="(inference) " + args.exp_name,
