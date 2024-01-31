@@ -23,7 +23,7 @@ def main(args):
                     "query": row["Prompt"].replace("<mask>.", ""),
                     "obj_label": row["Ans"],
                     "sub_label": row["Subject"],
-                    "candidates": row["Candidate"],
+                    "candidates": row["Candidate Ans"],
                 }
             )
     ds = Dataset.from_list(dataset)
