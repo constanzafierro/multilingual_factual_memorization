@@ -63,8 +63,8 @@ def filter_trivial_examples(ds):
 
     filtered = ds.filter(lambda ex: not is_trivial_example(ex))
     if wandb.run is not None:
-        wandb.run.summary["size_before_filter"] = len(ds)
-        wandb.run.summary["size_after_filter"] = len(filtered)
+        wandb.run.summary["trivial_filter/size_before"] = len(ds)
+        wandb.run.summary["trivial_filter/size_after"] = len(filtered)
     return filtered
 
 

@@ -77,8 +77,8 @@ def get_mpararel_templates(lang, relation_filename, mask_lm=False):
             continue
         final_templates.append(template)
     if wandb.run is not None:
-        wandb.run.summary[f"templates_count/{lang}_{relation_filename}"] = len(
-            relation_filename
+        wandb.log(
+            {f"templates_count/{relation_filename}/{lang}": len(relation_filename)}
         )
     return final_templates
 

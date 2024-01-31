@@ -1,6 +1,6 @@
 import argparse
 import os
-
+import collections
 import pandas as pd
 import wandb
 from constants import LANGUAGES
@@ -12,10 +12,19 @@ from mpararel_to_hf import filter_trivial_examples
 def main(args):
     data_dir = os.path.join(args.bmlama_clone_folder, "1_easyrun/BMLAMA17")
     dataset = []
-    for lang in tqdm(LANGUAGES, desc=""):
+    ids_to_remove = set()
+    metrics = collections.defaultdict(int)
+    for lang in tqdm(LANGUAGES, desc="Languages"):
         df = pd.read_csv(os.path.join(data_dir, lang + ".tsv"), sep="\t")
         for index, row in df.iterrows():
-            assert row["Prompt"].endswith("<mask>.")
+            if not row["Prompt"].endswith("<mask>."):
+                ids_to_remove.add(index)
+                metrics[f"non_autoregressive/{lang}"] += 1
+    for lang in tqdm(LANGUAGES, desc="Languages"):
+        df = pd.read_csv(os.path.join(data_dir, lang + ".tsv"), sep="\t")
+        for index, row in df.iterrows():
+            if index in ids_to_remove:
+                continue
             dataset.append(
                 {
                     "id": f"{lang}_{index}",
@@ -26,6 +35,7 @@ def main(args):
                     "candidates": row["Candidate Ans"],
                 }
             )
+    wandb.log(metrics)
     ds = Dataset.from_list(dataset)
     ds = filter_trivial_examples(ds)
     ds.push_to_hub(args.hf_dataset_name)
