@@ -51,6 +51,19 @@ def ensure_crosslingual(ds):
     )
 
 
+def filter_trivial_examples(ds):
+    def is_trivial_example(ex):
+        objs = ex["obj_label"]
+        if not isinstance(objs, list):
+            objs = [objs]
+        for obj in objs:
+            if obj.lower() in ex["query"].lower():
+                True
+        return False
+
+    return ds.filter(lambda ex: not is_trivial_example(ex))
+
+
 def main(args):
     dataset = []
     patterns_path = os.path.join(MPARAREL_FOLDER, PATTERNS_FOLDER)
@@ -93,6 +106,7 @@ def main(args):
                 )
     ds = Dataset.from_list(dataset)
     ds = ensure_crosslingual(ds)
+    ds = filter_trivial_examples(ds)
     ds.push_to_hub(args.hf_dataset_name)
 
 
@@ -104,6 +118,6 @@ if __name__ == "__main__":
     parser.add_argument("--use_aliases_folder", action="store_true")
     args = parser.parse_args()
 
-    wandb.init(project="push_mpararel_hf")
+    wandb.init(project="push_hf_xlingual_ds", name="mpararel")
 
     main(args)

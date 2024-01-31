@@ -6,6 +6,7 @@ import wandb
 from constants import LANGUAGES
 from datasets import Dataset
 from tqdm import tqdm
+from mpararel_to_hf import filter_trivial_examples
 
 
 def main(args):
@@ -26,6 +27,7 @@ def main(args):
                 }
             )
     ds = Dataset.from_list(dataset)
+    ds = filter_trivial_examples(ds)
     ds.push_to_hub(args.hf_dataset_name)
 
 
@@ -35,6 +37,6 @@ if __name__ == "__main__":
     parser.add_argument("--hf_dataset_name", type=str, default="coastalcph/bmlama10")
     args = parser.parse_args()
 
-    wandb.init(project="push_mpararel_hf")
+    wandb.init(project="push_hf_xlingual_ds", name="blama10")
 
     main(args)
