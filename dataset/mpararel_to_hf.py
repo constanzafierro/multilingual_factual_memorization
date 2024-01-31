@@ -3,7 +3,6 @@ import collections
 import os
 
 import wandb
-from constants import LANGUAGES
 from datasets import Dataset
 from pararel_utils import (
     MPARAREL_FOLDER,
@@ -18,7 +17,6 @@ from tqdm import tqdm
 
 
 def ensure_crosslingual(ds):
-    ds = ds.filter(lambda ex: ex["language"] in LANGUAGES)
     ds_t0 = ds.filter(lambda ex: ex["template_id"] == 0)
 
     lang_relation_to_sub = collections.defaultdict(set)
