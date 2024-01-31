@@ -4,6 +4,7 @@ import os
 
 import wandb
 from datasets import Dataset
+from constants import LANGUAGES
 from pararel_utils import (
     MPARAREL_FOLDER,
     PATTERNS_FOLDER,
@@ -17,6 +18,7 @@ from tqdm import tqdm
 
 
 def ensure_crosslingual(ds):
+    ds = ds.filter(lambda ex: ex["language"] in args.languages)
     ds_t0 = ds.filter(lambda ex: ex["template_id"] == 0)
 
     lang_relation_to_sub = collections.defaultdict(set)
@@ -116,6 +118,12 @@ if __name__ == "__main__":
     parser = argparse.ArgumentParser()
     parser.add_argument(
         "--hf_dataset_name", type=str, default="coastalcph/xlingual_mpararel"
+    )
+    parser.add_argument(
+        "--languages",
+        nargs="+",
+        default=LANGUAGES,
+        help="",
     )
     parser.add_argument("--use_aliases_folder", action="store_true")
     args = parser.parse_args()
