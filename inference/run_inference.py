@@ -24,46 +24,15 @@ from dataset.pararel_utils import SUBJECT_QCODE
 
 device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
 NUM_BEAMS = 1
-DEFAULT_TEMPLATE = "query_in_response"
-DEFAULT_INSTRUCTION = "Complete the fact in as few words as possible"
-
-TEMPLATES = {
-    "query_in_instructions": (
-        "Below is an instruction that describes a task. "
-        "Write a response that appropriately completes the request.\n\n"
-        "### Instruction:\n{}: {}\n\n### Response:"
-    ),
-    "query_in_response": (
-        "Below is an instruction that describes a task. "
-        "Write a response that appropriately completes the request.\n\n"
-        "### Instruction:\n{}\n\n### Response: {}"
-    ),
-    "query_in_input": (
-        "Below is an instruction that describes a task. "
-        "Write a response that appropriately completes the request.\n\n"
-        "### Instruction:\n{}\n\n### Input:\n{}\n\n### Response:"
-    ),
-}
 
 
-def prepare_prompt(query, model_name_or_path, instruction, template=None):
-    if "alpaca" in model_name_or_path:
-        instruction = instruction
-        template = TEMPLATES[template]
-        return template.format(instruction, query)
-    elif "flan" in model_name_or_path:
-        if len(args.instruction):
-            return "{}: {}".format(instruction, query)
-        else:
-            return query
-    elif "instruct" in model_name_or_path:
-        return "{}\n{}".format(instruction, query)
-    elif "chat" in model_name_or_path:
-        return "[INST] {} [/INST] {}".format(instruction, query)
-    elif "mt5" in model_name_or_path:
+def prepare_prompt(query, model_name_or_path, instruction, is_mlm_template):
+    if "mt5" in model_name_or_path:
+        if is_mlm_template:
+            return query.replace("[Y]", "<extra_id_0>")
         return query + " <extra_id_0> "
-    else:
-        return query
+    # Assume autorregressive template and model.
+    return query
 
 
 def remove_bos(tokenizer, seq, input_ids):
@@ -186,7 +155,7 @@ def inference(dataset, tokenizer, model, args, experiment_dir):
         query = example["query"]
         with torch.no_grad():
             prompt = prepare_prompt(
-                query, args.model_name_or_path, args.instruction, args.template
+                query, args.model_name_or_path, args.instruction, args.is_mlm_template
             )
             input_ids = tokenizer.encode(prompt, return_tensors="pt").to(device)
             model_output = model.generate(
@@ -290,7 +259,12 @@ if __name__ == "__main__":
     parser.add_argument(
         "--dataset_name",
         type=str,
-        default="coastalcph/xlingual_mpararel",
+        default="coastalcph/xlingual_mpararel_autorr",
+        help="",
+    )
+    parser.add_argument(
+        "--is_mlm_template",
+        action="store_true",
         help="",
     )
     parser.add_argument(
@@ -300,15 +274,9 @@ if __name__ == "__main__":
         help="",
     )
     parser.add_argument(
-        "--template",
-        type=str,
-        default=DEFAULT_TEMPLATE,
-        help="query_in_instructions, query_in_response or query_in_input",
-    )
-    parser.add_argument(
         "--instruction",
         type=str,
-        default=DEFAULT_INSTRUCTION,
+        default=None,
     )
     parser.add_argument(
         "--output_dir",
