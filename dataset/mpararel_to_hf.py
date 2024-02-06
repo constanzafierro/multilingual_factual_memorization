@@ -18,6 +18,9 @@ from tqdm import tqdm
 
 
 def ensure_crosslingual(ds, args):
+    # We keep only the subjects that are in all the languages per relation
+    # (so if a language does not have any examples in a relation it won't
+    # constraint the other languages).
     ds = ds.filter(lambda ex: ex["language"] in args.languages)
     ds_t0 = ds.filter(lambda ex: ex["template_id"] == 0)
 
@@ -41,6 +44,7 @@ def ensure_crosslingual(ds, args):
                 shared_subjs = shared_subjs.intersection(subs)
         rel_to_shared_subjs[rel] = shared_subjs
 
+    print("Percentage of subjects kept from the original set that the language had.")
     for rel in relation_to_lang_to_subjs.keys():
         print(rel)
         for lang, objs in relation_to_lang_to_subjs[rel].items():
@@ -80,7 +84,9 @@ def main(args):
             os.listdir(os.path.join(patterns_path, lang)), desc="Relations"
         ):
             templates = []
-            for template in get_mpararel_templates(lang, relation_filename):
+            for template in get_mpararel_templates(
+                lang, relation_filename, mask_lm=args.mask_lm
+            ):
                 assert template.endswith("[Y]")
                 template = template.replace("[Y]", "").strip()
                 templates.append(template)
@@ -111,15 +117,18 @@ def main(args):
     ds = Dataset.from_list(dataset)
     ds = filter_trivial_examples(ds)
     ds = ensure_crosslingual(ds, args)
-    print("Counts per language")
-    print(collections.Counter(ds.filter(lambda ex: ex["template_id"] == 0)["language"]))
+    print(
+        "Counts per language (relation-subj):",
+        collections.Counter(ds.filter(lambda ex: ex["template_id"] == 0)["language"]),
+    )
+    print("Counts per language (total queries):", collections.Counter(ds["language"]))
     ds.push_to_hub(args.hf_dataset_name)
 
 
 if __name__ == "__main__":
     parser = argparse.ArgumentParser()
     parser.add_argument(
-        "--hf_dataset_name", type=str, default="coastalcph/xlingual_mpararel"
+        "--hf_dataset_name", type=str, default="coastalcph/xlingual_mpararel_autorr"
     )
     parser.add_argument(
         "--languages",
@@ -127,6 +136,7 @@ if __name__ == "__main__":
         default=LANGUAGES,
         help="",
     )
+    parser.add_argument("--mask_lm", action="store_true")
     parser.add_argument("--use_aliases_folder", action="store_true")
     args = parser.parse_args()
 
