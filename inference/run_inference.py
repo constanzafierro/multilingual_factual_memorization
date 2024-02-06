@@ -202,7 +202,7 @@ def main(args):
         args.exp_name, args.model_name_or_path.replace("/", "-")
     )
     experiment_dir = os.path.join(args.output_dir, experiment_name)
-    os.makedirs(experiment_dir)
+    os.makedirs(experiment_dir, exist_ok=True)
 
     print("Loading model")
     use_fast = True
