@@ -102,6 +102,30 @@ def get_mpararel_subject_object(
     return unique_subjects
 
 
+def get_mpararel_subject_object_aliases(
+    lang, relation_filename, tuples_folder, aliases_folder
+):
+    tuples_data = _get_mpararel_items(
+        os.path.join(MPARAREL_FOLDER, tuples_folder, lang, relation_filename)
+    )
+    counts = collections.Counter([data[SUBJECT_KEY] for data in tuples_data])
+    unique_subjects_data = []
+    for data in tuples_data:
+        if counts[data[SUBJECT_KEY]] > 1:
+            continue
+        unique_subjects_data.append(data)
+    aliases_tuples_data = _get_mpararel_items(
+        os.path.join(MPARAREL_FOLDER, aliases_folder, lang, relation_filename)
+    )
+    obj_id_to_aliases = {
+        data[OBJECT_QCODE]: data[OBJECT_KEY] for data in aliases_tuples_data
+    }
+    for data in unique_subjects_data:
+        aliases = obj_id_to_aliases[data[OBJECT_QCODE]]
+        data[OBJECT_KEY] = [data[OBJECT_KEY], *aliases]
+    return unique_subjects_data
+
+
 def get_target_object(tokenizer, object_):
     # This works for SentencePiece tokenizers (e.g. T5) which
     # tokenize space and no space to the same id. It's also what

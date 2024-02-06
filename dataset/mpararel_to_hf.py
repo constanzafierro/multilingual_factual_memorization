@@ -13,6 +13,7 @@ from pararel_utils import (
     TUPLES_FOLDER,
     get_mpararel_subject_object,
     get_mpararel_templates,
+    get_mpararel_subject_object_aliases,
 )
 from tqdm import tqdm
 
@@ -72,12 +73,22 @@ def filter_trivial_examples(ds):
     return filtered
 
 
+def get_subject_object_data(args, lang, relation_filename):
+    if args.use_aliases_folder:
+        return get_mpararel_subject_object_aliases(
+            lang, relation_filename, TUPLES_FOLDER, TUPLES_FOLDER + "_with_aliases"
+        )
+    return get_mpararel_subject_object(
+        lang,
+        relation_filename,
+        tuples_folder=TUPLES_FOLDER,
+        only_tuple=False,
+    )
+
+
 def main(args):
     dataset = []
     patterns_path = os.path.join(MPARAREL_FOLDER, PATTERNS_FOLDER)
-    tuples_folder = TUPLES_FOLDER
-    if args.use_aliases_folder:
-        tuples_folder += "_with_aliases"
     for lang in tqdm(os.listdir(patterns_path), desc="Languages"):
         os.makedirs(os.path.join(patterns_path, lang), exist_ok=True)
         for relation_filename in tqdm(
@@ -90,12 +101,7 @@ def main(args):
                 assert template.endswith("[Y]")
                 template = template.replace("[Y]", "").strip()
                 templates.append(template)
-            tuples_data = get_mpararel_subject_object(
-                lang,
-                relation_filename,
-                tuples_folder=tuples_folder,
-                only_tuple=False,
-            )
+            tuples_data = get_subject_object_data(args, lang, relation_filename)
             relation = relation_filename.replace(".jsonl", "")
             for tuple_ in tuples_data:
                 dataset.extend(
