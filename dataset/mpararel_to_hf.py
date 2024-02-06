@@ -98,8 +98,9 @@ def main(args):
             for template in get_mpararel_templates(
                 lang, relation_filename, mask_lm=args.mask_lm
             ):
-                assert args.mask_lm or template.endswith("[Y]")
-                template = template.replace("[Y]", "").strip()
+                if not args.mask_lm:
+                    assert template.endswith("[Y]")
+                    template = template.replace("[Y]", "").strip()
                 templates.append(template)
             tuples_data = get_subject_object_data(args, lang, relation_filename)
             relation = relation_filename.replace(".jsonl", "")
