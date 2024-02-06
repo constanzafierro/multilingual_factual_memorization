@@ -121,6 +121,11 @@ def get_mpararel_subject_object_aliases(
         data[OBJECT_QCODE]: data[OBJECT_KEY] for data in aliases_tuples_data
     }
     for data in unique_subjects_data:
+        if data[OBJECT_QCODE] not in obj_id_to_aliases:
+            print(
+                f"Did not find {OBJECT_QCODE} aliases in ({lang}, {relation_filename})"
+            )
+            continue
         aliases = obj_id_to_aliases[data[OBJECT_QCODE]]
         data[OBJECT_KEY] = [data[OBJECT_KEY], *aliases]
     return unique_subjects_data
