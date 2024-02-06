@@ -59,7 +59,7 @@ def prepare_prompt(query, model_name_or_path, instruction, template=None):
     elif "instruct" in model_name_or_path:
         return "{}\n{}".format(instruction, query)
     elif "chat" in model_name_or_path:
-        return "[INST] {}: {} [/INST] ".format(instruction, query)
+        return "[INST] {} [/INST] {}".format(instruction, query)
     elif "mt5" in model_name_or_path:
         return query + " <extra_id_0> "
     else:
@@ -290,7 +290,7 @@ if __name__ == "__main__":
     parser.add_argument(
         "--dataset_name",
         type=str,
-        default="coastalcph/mpararel_with_aliases",
+        default="coastalcph/xlingual_mpararel",
         help="",
     )
     parser.add_argument(

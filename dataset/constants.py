@@ -34,4 +34,4 @@ COUNTERFACT_RELATIONS = [
     "P937",
 ]
 
-LANGUAGES = ["en", "es", "fr", "vi", "tr", "ru", "uk", "ja", "ko", "he"]
+LANGUAGES = ["en", "es", "vi", "tr", "ru", "uk", "ja", "ko", "he", "fa", "ar"]

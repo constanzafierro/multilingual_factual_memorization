@@ -4,15 +4,18 @@ import os
 import json
 import wandb
 from datasets import load_dataset
-from f1_score import compute_score
+from inference.f1_score import compute_score
 
 from dataset.pararel_utils import OBJECT_KEY
 
 
-def evaluate(dataset, id_to_prediction):
+def evaluate(dataset, id_to_prediction, langs):
     # compute F1 as max across any alias for any answer for the most recent, most frequent, or specific-year answer
     qa_targets, qa_predictions = [], []
     num_empty = 0
+    if langs:
+        langs = set(langs)
+        dataset = dataset.filter(lambda ex: ex["language"] in langs)
     for example in dataset:
         query_id = example["id"]
         targets = example[OBJECT_KEY]
@@ -21,7 +24,6 @@ def evaluate(dataset, id_to_prediction):
 
         if not len(prediction["answer"]):
             num_empty += 1
-            # print("Warning: the prediction for query='{}' was empty.".format(query))
             continue
 
         qa_targets.append(
@@ -34,52 +36,48 @@ def evaluate(dataset, id_to_prediction):
 
     print("Evaluating on {} datapoints".format(len(qa_targets)))
     print("Num empty", num_empty)
+    if wandb.run is not None:
+        wandb.run.summary["empty_preds"] = num_empty
+        wandb.run.summary["datapoints"] = len(qa_targets)
     df, scores = compute_score(predictions=qa_predictions, references=qa_targets)
     return df, {"n_datapoints": len(qa_targets), **scores}
 
 
-def load_queries(data_path):
-    unique_queries = dict()
-    queries = load_dataset(data_path, split="train")
-    for query in queries:
-        query_id = "_".join(query["id"].split("_")[:2])
-        if query_id not in unique_queries and len(query["answer"]):
-            unique_queries[query_id] = query
-    return unique_queries
-
-
-def load_aliases(data_path):
-    all_aliases = dict()
-    aliases = load_dataset(data_path, split="train")
-    for qid, al in aliases[0].items():
-        all_aliases[qid] = al
-    return all_aliases
-
-
 def load_predictions(data_path):
-    predictions = {}
+    id_to_preds = {}
     with open(data_path) as fhandle:
         for line in fhandle:
             data = json.loads(line)
             example_id = data["example_id"]
-            del data["example_id"]
-            data["predictions"] = [p for p in data["predictions"] if len(p["answer"])]
-            if len(predictions) == 0:
-                print(
-                    "Example of data predictions for example_id={}: {}".format(
-                        example_id, data
-                    )
-                )
-            predictions[example_id] = data
-
-    return predictions
+            data.pop("example_id")
+            # We assume there is only one prediction.
+            data.update(data["predictions"][0])
+            data.pop("predictions")
+            id_to_preds[example_id] = data
+    return id_to_preds
 
 
 def compute_metrics(df):
-    # columns=["id", "prediction", "ground_truth", "f1", "exact_match"]
     metrics = defaultdict(float)
-    # TODO: split id in {lang}_{relation}_{tuple_[SUBJECT_QCODE]}_{template_id}
-    df.groupby(by=[])
+    df["language"] = df.apply(lambda ex: ex["id"].split("_")[0], axis=1)
+    df["relation"] = df.apply(lambda ex: ex["id"].split("_")[1], axis=1)
+    df["template_id"] = df.apply(lambda ex: ex["id"].split("_")[-1], axis=1)
+    df["subj_id"] = df.apply(lambda ex: ex["id"].split("_")[-2], axis=1)
+    # Count memorized examples per relation, only one template per subject.
+    memorized = len(
+        df[df.exact_match][["relation", "subj_id", "template_id"]]
+        .groupby(by=["relation", "subj_id"], as_index=False)
+        .agg(list)
+    )
+    relation_count = (
+        memorized[["relation", "subj_id"]]
+        .groupby(by=["relation"], as_index=False)
+        .count()
+        .values
+    )
+    metrics["memorized_examples"] = memorized
+    for relation, count in relation_count:
+        metrics[f"memorized_examples/{relation}"] = count
     return metrics
 
 
@@ -90,7 +88,7 @@ def main(args):
 
     dataset = load_dataset(args.dataset_name)["train"]
     id_to_prediction = load_predictions(args.predictions_path)
-    df, scores = evaluate(dataset, id_to_prediction)
+    df, scores = evaluate(dataset, id_to_prediction, langs=args.lang)
     wandb.log({k: v for k, v in scores.items() if not isinstance(v, list)})
     df.to_json(os.path.join(experiment_dir, "eval_per_example.json"))
     wandb.log(compute_metrics(df))
@@ -101,7 +99,7 @@ if __name__ == "__main__":
     parser.add_argument(
         "--dataset_name",
         type=str,
-        default="coastalcph/mpararel",
+        default="coastalcph/xlingual_mpararel",
         help="",
     )
     parser.add_argument("--predictions_path", type=str, help="Path to predictions")
@@ -111,11 +109,12 @@ if __name__ == "__main__":
         default="output",
         help="Dir where model outputs will be stored",
     )
-    parser.add_argument("--exp_name", type=str, default="debug", help="Experiment name")
+    parser.add_argument("--exp_name", type=str, help="Experiment name")
+    parser.add_argument("--langs", default=[], nargs="+", help="Experiment name")
     args = parser.parse_args()
 
     wandb.init(
-        project="mpararel_eval",
+        project="xlingual_mpararel_eval",
         name=args.exp_name,
         config=args,
     )
