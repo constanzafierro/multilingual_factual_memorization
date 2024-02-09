@@ -123,7 +123,8 @@ def main(args):
                 )
     ds = Dataset.from_list(dataset)
     ds = filter_trivial_examples(ds)
-    ds = ensure_crosslingual(ds, args)
+    if args.ensure_crosslingual:
+        ds = ensure_crosslingual(ds, args)
     print(
         "Counts per language (relation-subj):",
         collections.Counter(ds.filter(lambda ex: ex["template_id"] == 0)["language"]),
@@ -143,6 +144,7 @@ if __name__ == "__main__":
         default=LANGUAGES,
         help="",
     )
+    parser.add_argument("--ensure_crosslingual", action="store_true")
     parser.add_argument("--mask_lm", action="store_true")
     parser.add_argument("--use_aliases_folder", action="store_true")
     args = parser.parse_args()

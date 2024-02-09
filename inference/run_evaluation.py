@@ -76,6 +76,7 @@ def compute_metrics(df):
         .values
     )
     metrics["memorized_examples"] = len(memorized)
+    metrics["memorized_relations"] = len(relation_count)
     for relation, count in relation_count:
         metrics[f"memorized_examples/{relation}"] = count
     return metrics
@@ -118,7 +119,7 @@ if __name__ == "__main__":
 
     wandb.init(
         project="xlingual_mpararel_eval",
-        name=args.exp_name,
+        name=os.path.basename(args.predictions_path),
         config=args,
     )
 
