@@ -82,7 +82,9 @@ def compute_metrics(df):
 
 
 def main(args):
-    experiment_dir = os.path.join(args.output_dir, args.exp_name)
+    experiment_dir = os.path.join(
+        args.output_dir, os.path.basename(args.prediction_path)
+    )
     if not os.path.exists(experiment_dir):
         os.makedirs(experiment_dir)
 
