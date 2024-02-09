@@ -149,6 +149,6 @@ if __name__ == "__main__":
     parser.add_argument("--use_aliases_folder", action="store_true")
     args = parser.parse_args()
 
-    wandb.init(project="push_hf_xlingual_ds", name="mpararel")
+    wandb.init(project="push_hf_xlingual_ds", name=args.hf_dataset_name)
 
     main(args)
