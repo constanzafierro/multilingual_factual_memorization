@@ -45,7 +45,7 @@ def evaluate(dataset, id_to_prediction, langs):
 
 def load_predictions(data_path):
     id_to_preds = {}
-    with open(data_path) as fhandle:
+    with open(os.path.join(data_path, "predictions.json")) as fhandle:
         for line in fhandle:
             data = json.loads(line)
             example_id = data["example_id"]

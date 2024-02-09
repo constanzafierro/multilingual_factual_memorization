@@ -203,6 +203,7 @@ def main(args):
     )
     experiment_dir = os.path.join(args.output_dir, experiment_name)
     os.makedirs(experiment_dir, exist_ok=True)
+    wandb.config["final_dir"] = experiment_dir
 
     print("Loading model")
     use_fast = True
