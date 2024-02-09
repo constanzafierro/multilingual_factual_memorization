@@ -64,7 +64,7 @@ def compute_metrics(df):
     df["template_id"] = df.apply(lambda ex: ex["id"].split("_")[-1], axis=1)
     df["subj_id"] = df.apply(lambda ex: ex["id"].split("_")[-2], axis=1)
     # Count memorized examples per relation, only one template per subject.
-    memorized = len(
+    memorized = (
         df[df.exact_match][["relation", "subj_id", "template_id"]]
         .groupby(by=["relation", "subj_id"], as_index=False)
         .agg(list)
@@ -75,7 +75,7 @@ def compute_metrics(df):
         .count()
         .values
     )
-    metrics["memorized_examples"] = memorized
+    metrics["memorized_examples"] = len(memorized)
     for relation, count in relation_count:
         metrics[f"memorized_examples/{relation}"] = count
     return metrics
