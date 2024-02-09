@@ -84,7 +84,7 @@ def compute_metrics(df):
 def main(args):
     experiment_dir = os.path.join(args.output_dir, args.exp_name)
     if not os.path.exists(experiment_dir):
-        os.mkdir(experiment_dir)
+        os.makedirs(experiment_dir)
 
     dataset = load_dataset(args.dataset_name)["train"]
     id_to_prediction = load_predictions(args.predictions_path)
