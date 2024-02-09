@@ -83,10 +83,11 @@ def compute_metrics(df):
 
 def main(args):
     experiment_dir = os.path.join(
-        args.output_dir, os.path.basename(args.prediction_path)
+        args.output_dir, os.path.basename(args.predictions_path)
     )
     if not os.path.exists(experiment_dir):
         os.makedirs(experiment_dir)
+    wandb.config["final_dir"] = experiment_dir
 
     dataset = load_dataset(args.dataset_name)["train"]
     id_to_prediction = load_predictions(args.predictions_path)
