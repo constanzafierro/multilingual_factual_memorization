@@ -315,7 +315,7 @@ if __name__ == "__main__":
     project_name = "xlingual_inference"
     wandb.init(
         project=project_name,
-        name=args.exp_name,
+        name="{} {}".format(args.exp_name, args.model_name_or_path),
         config=args,
     )
 
