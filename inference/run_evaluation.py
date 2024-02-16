@@ -36,11 +36,8 @@ def evaluate(dataset, id_to_prediction, langs):
 
     print("Evaluating on {} datapoints".format(len(qa_targets)))
     print("Num empty", num_empty)
-    if wandb.run is not None:
-        wandb.run.summary["empty_preds"] = num_empty
-        wandb.run.summary["datapoints"] = len(qa_targets)
     df, scores = compute_score(predictions=qa_predictions, references=qa_targets)
-    return df, {"n_datapoints": len(qa_targets), **scores}
+    return df, {"n_datapoints": len(qa_targets), "empty_preds": num_empty, **scores}
 
 
 def load_predictions(data_path):
@@ -77,6 +74,7 @@ def compute_metrics(df):
     )
     metrics["memorized_examples"] = len(memorized)
     metrics["memorized_relations"] = len(relation_count)
+    metrics["total_relations"] = len(df.relation.unique())
     for relation, count in relation_count:
         metrics[f"memorized_examples/{relation}"] = count
     return metrics

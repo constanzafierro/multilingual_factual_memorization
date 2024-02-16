@@ -78,16 +78,16 @@ def _compute(dataset, predictions):
                     (qa["id"], prediction, ground_truths, f1[-1], exact_match[-1])
                 )
 
-    ave_exact_match = 100.0 * sum(exact_match) / len(exact_match)
-    ave_f1 = 100.0 * sum(f1) / len(f1)
+    avg_exact_match = 100.0 * sum(exact_match) / len(exact_match)
+    avg_f1 = 100.0 * sum(f1) / len(f1)
 
     return pd.DataFrame(
         df_data, columns=["id", "prediction", "ground_truth", "f1", "exact_match"]
     ), {
         "exact_match": exact_match,
         "f1": f1,
-        "ave_exact_match": ave_exact_match,
-        "ave_f1": ave_f1,
+        "avg_exact_match": avg_exact_match,
+        "avg_f1": avg_f1,
     }
 
 
