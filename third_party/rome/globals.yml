@@ -1,13 +1,13 @@
 ---
   # Result files
-  RESULTS_DIR: "results"
+  RESULTS_DIR: "/projects/nlp/data/constanzam/rome/results"
 
   # Data files
-  DATA_DIR: "data"
-  STATS_DIR: "data/stats"
+  DATA_DIR: "/projects/nlp/data/constanzam/rome/data"
+  STATS_DIR: "/projects/nlp/data/constanzam/rome/data/stats"
 
   # Hyperparameters
-  HPARAMS_DIR: "hparams"
+  HPARAMS_DIR: "third_party/rome/hparams"
 
   # Remote URLs
   REMOTE_ROOT_URL: "https://rome.baulab.info"
