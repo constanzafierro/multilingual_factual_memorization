@@ -346,15 +346,9 @@ if __name__ == "__main__":
         help="",
     )
     parser.add_argument(
-        "--cache_dir",
-        default=None,
-        type=str,
-        help="",
-    )
-    parser.add_argument(
         "--model_name",
-        required=True,
         type=str,
+        default=None,
         help="",
     )
     parser.add_argument(
@@ -381,6 +375,8 @@ if __name__ == "__main__":
         help="",
     )
     args = parser.parse_args()
+    if not args.model_name:
+        args.model_name = args.model_name_or_path.split("/")[1]
     wandb.init(
         project="causal_analysis_mpararel",
         name=" ".join(
