@@ -15,6 +15,7 @@ from third_party.rome.experiments.causal_trace import (
     predict_from_input,
     collect_embedding_std,
 )
+import pandas as pd
 import numpy as np
 from matplotlib import pyplot as plt
 from accelerate import init_empty_weights, load_checkpoint_and_dispatch, Accelerator
@@ -240,11 +241,19 @@ def plot_last_subj_token(differences, low_score, avg_over_n, modelname, kind, sa
         plt.show()
 
 
+def get_memorized_ds(dataset_name, eval_df_filename):
+    df = pd.read_json(eval_df_filename)
+    memorized_ids = set(df[df.exact_match]["id"].values)
+    ds = load_dataset(dataset_name)["train"]
+    ds = ds.filter(lambda ex: ex["id"] in memorized_ids)
+    return ds
+
+
 def main(args):
     data_id = "_".join(
         [
-            args.split,
-            "" if not args.mutability_type else args.mutability_type,
+            args.language,
+            args.dataset_name.split("/")[1]
         ]
     )
     cache_output_dir = os.path.join(
@@ -266,26 +275,23 @@ def main(args):
     )
 
     print("Computing noise level...")
-    ds = load_dataset(args.updates_dataset)
-    ds = ds[args.split]
-    if args.mutability_type is not None:
-        ds = ds.filter(lambda ex: ex["type"] == args.mutability_type)
+    ds = get_memorized_ds(args.dataset_name, args.eval_df_filename)
     print("Computing causal analysis for", len(ds))
     noise_level = 3 * collect_embedding_std(
         mt,
-        [ex["query"]["label"] for ex in ds],
+        [ex["sub_label"] for ex in ds],
         subjects_from_ds=data_id,
     )
     print(f"Using noise level {noise_level}")
     kind = "mlp"
     for ex in tqdm(ds, desc="Examples"):
-        ex_id = f"{ex['query']['rel_id']}_{ex['query']['qid']}"
+        ex_id = ex["id"]
         filename = os.path.join(cache_output_dir, f"{ex_id}{kind}.npz")
         if not os.path.isfile(filename):
             result = calculate_hidden_flow(
                 mt,
-                ex["prediction"]["query"],
-                ex["query"]["label"],
+                ex["query"],
+                ex["sub_label"],
                 noise=noise_level,
                 kind=kind,
             )
@@ -358,31 +364,29 @@ if __name__ == "__main__":
         help="",
     )
     parser.add_argument(
-        "--updates_dataset",
+        "--dataset_name",
         required=True,
         type=str,
         help="",
     )
     parser.add_argument(
-        "--split",
-        default="validation",
+        "--eval_df_filename",
+        required=True,
         type=str,
         help="",
     )
     parser.add_argument(
-        "--mutability_type",
-        default=None,
+        "--language",
         type=str,
         help="",
     )
     args = parser.parse_args()
     wandb.init(
-        project="causal_analysis",
+        project="causal_analysis_mpararel",
         name=" ".join(
             [
                 args.model_name,
-                args.split,
-                "" if not args.mutability_type else args.mutability_type,
+                args.language
             ]
         ),
         config=args,

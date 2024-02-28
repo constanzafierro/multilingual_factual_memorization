@@ -92,7 +92,7 @@ def main(args):
     id_to_prediction = load_predictions(args.predictions_path)
     df, scores = evaluate(dataset, id_to_prediction, langs=args.langs)
     wandb.log({k: v for k, v in scores.items() if not isinstance(v, list)})
-    df.to_json(os.path.join(experiment_dir, "eval_per_example.json"))
+    df.to_json(os.path.join(experiment_dir, "eval_per_example_records.json"), orient="records")
     wandb.log(compute_metrics(df))
 
 
