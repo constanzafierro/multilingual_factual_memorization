@@ -33,6 +33,8 @@ from third_party.rome.experiments.causal_trace import (
 )
 from third_party.rome.util import nethook
 
+LANG_TO_FONT = {"ja": "TakaoGothic"}
+
 torch.set_grad_enabled(False)
 
 
@@ -367,6 +369,10 @@ def main(args):
     wandb.config["plots_output_dir"] = pdf_output_dir
     os.makedirs(cache_output_dir, exist_ok=True)
     os.makedirs(pdf_output_dir, exist_ok=True)
+
+    if args.lang in LANG_TO_FONT:
+        plt.rcParams["font.family"] = LANG_TO_FONT[args.lang]
+
     mt = load_model_and_tok(args)
     print("Testing prediction...")
     print(
