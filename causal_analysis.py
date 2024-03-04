@@ -13,6 +13,7 @@ from accelerate import Accelerator, init_empty_weights, load_checkpoint_and_disp
 from datasets import load_dataset
 from matplotlib import pyplot as plt
 from tqdm import tqdm
+from glob import glob
 from transformers import (
     AutoConfig,
     AutoModelForCausalLM,
@@ -209,9 +210,7 @@ def trace_important_window(
     return torch.stack(table)
 
 
-def plot_last_subj_token(
-    differences, names_and_counts, low_score, modelname, kind, savepdf
-):
+def plot_averages(differences, names_and_counts, low_score, modelname, kind, savepdf):
     window = 10
     fig, ax = plt.subplots(figsize=(3.5, 2), dpi=200)
     h = ax.pcolor(
@@ -277,36 +276,7 @@ def get_memorized_ds(dataset_name, eval_df_filename):
     return ds
 
 
-def main(args):
-    data_id = "_".join([args.language, args.dataset_name.split("/")[1]])
-    cache_output_dir = os.path.join(
-        args.output_folder, args.model_name, data_id, "cache_hidden_flow"
-    )
-    pdf_output_dir = os.path.join(args.output_folder, args.model_name, data_id, "plots")
-    wandb.config["cache_output_dir"] = cache_output_dir
-    wandb.config["plots_output_dir"] = pdf_output_dir
-    os.makedirs(cache_output_dir, exist_ok=True)
-    os.makedirs(pdf_output_dir, exist_ok=True)
-    mt = load_model_and_tok(args)
-    print("Testing prediction...")
-    print(
-        predict_token(
-            mt,
-            ["Megan Rapinoe plays the sport of", "The Space Needle is in the city of"],
-            return_p=True,
-        )
-    )
-
-    print("Computing noise level...")
-    ds = get_memorized_ds(args.dataset_name, args.eval_df_filename)
-    print("Computing causal analysis for", len(ds))
-    noise_level = 3 * collect_embedding_std(
-        mt,
-        [ex["sub_label"] for ex in ds],
-        subjects_from_ds=data_id,
-    )
-    print(f"Using noise level {noise_level}")
-    kind = "mlp"
+def plot_hidden_flow(mt, ds, cache_output_dir, pdf_output_dir, kind, noise_level):
     for ex in tqdm(ds, desc="Examples"):
         ex_id = ex["id"]
         filename = os.path.join(cache_output_dir, f"{ex_id}{kind}.npz")
@@ -334,7 +304,7 @@ def main(args):
 
     # Save plot of average.
     total_scores = collections.defaultdict(list)
-    files = os.listdir(cache_output_dir)
+    files = glob(os.path.join(cache_output_dir, f"*{kind}.npz"))
     for results_file in files:
         numpy_result = np.load(
             os.path.join(cache_output_dir, results_file), allow_pickle=True
@@ -352,7 +322,7 @@ def main(args):
         for i in range(numpy_result["subject_range"][-1], len(numpy_result["scores"])):
             total_scores["after_subj"].append(numpy_result["scores"][i])
         total_scores["low_score"].append(numpy_result["low_score"])
-    plot_last_subj_token(
+    plot_averages(
         np.array(
             [
                 np.mean(total_scores["before_subj"], axis=0),
@@ -382,9 +352,48 @@ def main(args):
             np.argmax(np.mean(total_scores["last_subj_token"], axis=0))
         )
     )
-    wandb.summary["avg_best_layer"] = np.argmax(
+    wandb.summary[f"{kind}_avg_best_layer"] = np.argmax(
         np.mean(total_scores["last_subj_token"], axis=0)
     )
+
+
+def main(args):
+    data_id = "_".join([args.language, args.dataset_name.split("/")[1]])
+    cache_output_dir = os.path.join(
+        args.output_folder, args.model_name, data_id, "cache_hidden_flow"
+    )
+    pdf_output_dir = os.path.join(args.output_folder, args.model_name, data_id, "plots")
+    wandb.config["cache_output_dir"] = cache_output_dir
+    wandb.config["plots_output_dir"] = pdf_output_dir
+    os.makedirs(cache_output_dir, exist_ok=True)
+    os.makedirs(pdf_output_dir, exist_ok=True)
+    mt = load_model_and_tok(args)
+    print("Testing prediction...")
+    print(
+        predict_token(
+            mt,
+            ["Megan Rapinoe plays the sport of", "The Space Needle is in the city of"],
+            return_p=True,
+        )
+    )
+
+    print("Computing noise level...")
+    eval_df_filename = os.path.join(
+        args.eval_dir,
+        f"{args.language}--{args.dataset_name.split('/')[1]}--{args.model_name}",
+        "eval_per_example_records.json",
+    )
+    ds = get_memorized_ds(args.dataset_name, eval_df_filename)
+    print("Computing causal analysis for", len(ds))
+    noise_level = 3 * collect_embedding_std(
+        mt,
+        [ex["sub_label"] for ex in ds],
+        subjects_from_ds=data_id,
+    )
+    print(f"Using noise level {noise_level}")
+    for kind in [None, "mlp", "attn"]:
+        print("Computing for", kind)
+        plot_hidden_flow(mt, ds, cache_output_dir, pdf_output_dir, kind, noise_level)
 
 
 if __name__ == "__main__":
@@ -414,7 +423,7 @@ if __name__ == "__main__":
         help="",
     )
     parser.add_argument(
-        "--eval_df_filename",
+        "--eval_dir",
         required=True,
         type=str,
         help="",
