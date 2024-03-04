@@ -427,7 +427,7 @@ if __name__ == "__main__":
     )
     args = parser.parse_args()
     if not args.model_name:
-        args.model_name = args.model_name_or_path.split("/")[1]
+        args.model_name = args.model_name_or_path.replace("/", "__")
     wandb.init(
         project="causal_analysis_mpararel",
         name=" ".join([args.model_name, args.language]),
