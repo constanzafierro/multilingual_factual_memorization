@@ -259,7 +259,7 @@ def get_memorized_ds(dataset_name, eval_df_filename):
         start_index = memorized_df[row]["start_answer"].item()
         if start_index != 0:
             example["query_inference"] = (
-                example["query"] + row["prediction"].item()[:start_index]
+                example["query"] + memorized_df[row]["prediction"].item()[:start_index]
             )
         else:
             example["query_inference"] = example["query"]

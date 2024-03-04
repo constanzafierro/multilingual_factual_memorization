@@ -199,7 +199,7 @@ def inference(dataset, tokenizer, model, args, experiment_dir):
 
 def main(args):
     experiment_name = "{}--{}".format(
-        args.exp_name, args.model_name_or_path.replace("/", "-")
+        args.exp_name, args.model_name_or_path.replace("/", "__")
     )
     experiment_dir = os.path.join(args.output_dir, experiment_name)
     os.makedirs(experiment_dir, exist_ok=True)
