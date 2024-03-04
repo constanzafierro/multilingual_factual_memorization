@@ -1,33 +1,35 @@
 import argparse
 import os
-import torch, numpy
 from collections import defaultdict
-from third_party.rome.util import nethook
-from third_party.rome.experiments.causal_trace import (
-    ModelAndTokenizer,
-    layername,
-    plot_trace_heatmap,
-)
-from third_party.rome.experiments.causal_trace import (
-    make_inputs,
-    decode_tokens,
-    predict_token,
-    predict_from_input,
-    collect_embedding_std,
-)
-import pandas as pd
+from functools import partial
+
+import numpy
 import numpy as np
+import pandas as pd
+import torch
+import wandb
+from accelerate import Accelerator, init_empty_weights, load_checkpoint_and_dispatch
+from datasets import load_dataset
 from matplotlib import pyplot as plt
-from accelerate import init_empty_weights, load_checkpoint_and_dispatch, Accelerator
+from tqdm import tqdm
 from transformers import (
     AutoConfig,
     AutoModelForCausalLM,
     AutoTokenizer,
     LlamaForCausalLM,
 )
-from tqdm import tqdm
-from datasets import load_dataset
-import wandb
+
+from third_party.rome.experiments.causal_trace import (
+    ModelAndTokenizer,
+    collect_embedding_std,
+    decode_tokens,
+    layername,
+    make_inputs,
+    plot_trace_heatmap,
+    predict_from_input,
+    predict_token,
+)
+from third_party.rome.util import nethook
 
 torch.set_grad_enabled(False)
 
@@ -242,20 +244,39 @@ def plot_last_subj_token(differences, low_score, avg_over_n, modelname, kind, sa
 
 
 def get_memorized_ds(dataset_name, eval_df_filename):
-    df = pd.read_json(eval_df_filename)
-    memorized_ids = set(df[df.exact_match]["id"].values)
+    def get_start_ans(pred, gt_list):
+        start_idx = None
+        pred = pred.lower()
+        for gt in gt_list:
+            id_found = pred.find(gt.lower())
+            if id_found != -1 and (start_idx is None or start_idx > id_found):
+                start_idx = id_found
+        return start_idx
+
+    def add_exact_query(example, memorized_df):
+        start_index = memorized_df[memorized_df.id == example["id"]]["start_answer"]
+        if start_index != 0:
+            example["query_inference"] = (
+                example["query"] + example["prediction"][:start_index]
+            )
+        else:
+            example["query_inference"] = example["query"]
+        return example
+
+    inference_df = pd.read_json(eval_df_filename)
+    memorized_df = inference_df[inference_df.exact_match].copy()
+    memorized_df["start_answer"] = memorized_df.apply(
+        lambda ex: get_start_ans(ex["prediction"], ex["ground_truth"]), axis=1
+    )
+    memorized_ids = set(memorized_df["id"].values)
     ds = load_dataset(dataset_name)["train"]
     ds = ds.filter(lambda ex: ex["id"] in memorized_ids)
+    ds = ds.map(partial(add_exact_query, memorized_df=memorized_df))
     return ds
 
 
 def main(args):
-    data_id = "_".join(
-        [
-            args.language,
-            args.dataset_name.split("/")[1]
-        ]
-    )
+    data_id = "_".join([args.language, args.dataset_name.split("/")[1]])
     cache_output_dir = os.path.join(
         args.output_folder, args.model_name, data_id, "cache_hidden_flow"
     )
@@ -290,7 +311,7 @@ def main(args):
         if not os.path.isfile(filename):
             result = calculate_hidden_flow(
                 mt,
-                ex["query"],
+                ex["query_inference"],
                 ex["sub_label"],
                 noise=noise_level,
                 kind=kind,
@@ -305,7 +326,7 @@ def main(args):
         plot_result = dict(numpy_result)
         plot_result["kind"] = kind
         pdfname = os.path.join(
-            pdf_output_dir, f'{str(numpy_result["answer"]).strip()}_{ex_id}{kind}.pdf'
+            pdf_output_dir, f'{str(numpy_result["answer"]).strip()}_{ex_id}_{kind}.pdf'
         )
         plot_trace_heatmap(numpy_result, savepdf=pdfname, modelname=args.model_name)
 
@@ -379,12 +400,7 @@ if __name__ == "__main__":
         args.model_name = args.model_name_or_path.split("/")[1]
     wandb.init(
         project="causal_analysis_mpararel",
-        name=" ".join(
-            [
-                args.model_name,
-                args.language
-            ]
-        ),
+        name=" ".join([args.model_name, args.language]),
         config=args,
     )
     main(args)
