@@ -1,4 +1,5 @@
 import argparse
+import collections
 import os
 from collections import defaultdict
 from functools import partial
@@ -208,7 +209,9 @@ def trace_important_window(
     return torch.stack(table)
 
 
-def plot_last_subj_token(differences, low_score, avg_over_n, modelname, kind, savepdf):
+def plot_last_subj_token(
+    differences, names_and_counts, low_score, modelname, kind, savepdf
+):
     window = 10
     fig, ax = plt.subplots(figsize=(3.5, 2), dpi=200)
     h = ax.pcolor(
@@ -222,16 +225,14 @@ def plot_last_subj_token(differences, low_score, avg_over_n, modelname, kind, sa
     ax.set_yticks([0.5 + i for i in range(len(differences))])
     ax.set_xticks([0.5 + i for i in range(0, differences.shape[1] - 6, 5)])
     ax.set_xticklabels(list(range(0, differences.shape[1] - 6, 5)))
-    ax.set_yticklabels(["Last subj token"])
+    ax.set_yticklabels([f"{n} ({c})" for n, c in names_and_counts])
     if not kind:
         ax.set_title("Impact of restoring state after corrupted input")
         ax.set_xlabel(f"single restored layer within {modelname}")
     else:
         kindname = "MLP" if kind == "mlp" else "Attn"
         ax.set_title(
-            "Avg. ({}) impact of restoring {} after corrupted input".format(
-                avg_over_n, kindname
-            )
+            "Avg. impact of restoring {} after corrupted input".format(kindname)
         )
         ax.set_xlabel(f"Center of interval of {window} restored {kindname} layers")
     plt.colorbar(h)
@@ -254,7 +255,9 @@ def get_memorized_ds(dataset_name, eval_df_filename):
         return start_idx
 
     def add_exact_query(example, memorized_df):
-        start_index = memorized_df[memorized_df.id == example["id"]]["start_answer"]
+        start_index = memorized_df[memorized_df.id == example["id"]][
+            "start_answer"
+        ].item()
         if start_index != 0:
             example["query_inference"] = (
                 example["query"] + example["prediction"][:start_index]
@@ -331,31 +334,58 @@ def main(args):
         plot_trace_heatmap(numpy_result, savepdf=pdfname, modelname=args.model_name)
 
     # Save plot of average.
-    scores_last_subj_token = None
-    low_scores = 0
+    total_scores = collections.defaultdict(list)
     files = os.listdir(cache_output_dir)
     for results_file in files:
         numpy_result = np.load(
             os.path.join(cache_output_dir, results_file), allow_pickle=True
         )
-        this_scores = numpy_result["scores"][numpy_result["subject_range"][-1] - 1]
-        if scores_last_subj_token is None:
-            scores_last_subj_token = this_scores
-        else:
-            scores_last_subj_token += this_scores
-        low_scores += numpy_result["low_score"]
+        first_subj_token = numpy_result["subject_range"][0]
+        last_subj_token = numpy_result["subject_range"][-1] - 1
+        total_scores["last_subj_token"].append(numpy_result["scores"][last_subj_token])
+        total_scores["first_subj_token"].append(
+            numpy_result["scores"][first_subj_token]
+        )
+        for i in range(0, numpy_result["subject_range"][0]):
+            total_scores["before_subj"].append(numpy_result["scores"][i])
+        for i in range(first_subj_token + 1, last_subj_token):
+            total_scores["mid_subj_tokens"].append(numpy_result["scores"][i])
+        for i in range(numpy_result["subject_range"][-1], len(numpy_result["scores"])):
+            total_scores["after_subj"].append(numpy_result["scores"][i])
+        total_scores["low_score"].append(numpy_result["low_score"])
     plot_last_subj_token(
-        np.array([scores_last_subj_token / len(files)]),
-        low_scores / len(files),
-        len(files),
+        np.array(
+            [
+                np.mean(total_scores["before_subj"], axis=0),
+                np.mean(total_scores["first_subj_token"], axis=0),
+                np.mean(total_scores["mid_subj_tokens"], axis=0),
+                np.mean(total_scores["last_subj_token"], axis=0),
+                np.mean(total_scores["after_subj"], axis=0),
+            ]
+        ),
+        [
+            (k, len(total_scores(k)))
+            for k in [
+                "before_subj",
+                "first_subj_token",
+                "mid_subj_tokens",
+                "last_subj_token",
+                "after_subj",
+            ]
+        ],
+        np.mean(total_scores["low_score"]),
         args.model_name,
         kind,
         savepdf=os.path.join(pdf_output_dir, "avg.pdf"),
     )
     print(
-        f"Biggest effect on {kind} on average in layer {np.argmax(scores_last_subj_token)}"
+        "Biggest effect on {kind} on average in layer {}".format(
+            np.argmax(np.mean(total_scores["last_subj_token"], axis=0))
+        )
     )
-    wandb.summary["avg_best_layer"] = np.argmax(scores_last_subj_token)
+    wandb.summary["avg_best_layer"] = np.argmax(
+        np.mean(total_scores["last_subj_token"], axis=0)
+    )
 
 
 if __name__ == "__main__":
