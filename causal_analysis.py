@@ -371,7 +371,7 @@ def main(args):
     os.makedirs(pdf_output_dir, exist_ok=True)
 
     if args.language in LANG_TO_FONT:
-        plt.rcParams["font.family"] = LANG_TO_FONT[args.lang]
+        plt.rcParams["font.family"] = LANG_TO_FONT[args.language]
 
     mt = load_model_and_tok(args)
     print("Testing prediction...")
