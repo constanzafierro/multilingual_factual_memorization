@@ -255,12 +255,11 @@ def get_memorized_ds(dataset_name, eval_df_filename):
         return start_idx
 
     def add_exact_query(example, memorized_df):
-        start_index = memorized_df[memorized_df.id == example["id"]][
-            "start_answer"
-        ].item()
+        row = memorized_df.id == example["id"]
+        start_index = memorized_df[row]["start_answer"].item()
         if start_index != 0:
             example["query_inference"] = (
-                example["query"] + example["prediction"][:start_index]
+                example["query"] + row["prediction"].item()[:start_index]
             )
         else:
             example["query_inference"] = example["query"]
