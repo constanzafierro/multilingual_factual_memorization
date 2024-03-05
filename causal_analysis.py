@@ -350,8 +350,8 @@ def plot_hidden_flow(mt, ds, cache_output_dir, pdf_output_dir, kind, noise_level
         savepdf=os.path.join(pdf_output_dir, "avg.pdf"),
     )
     print(
-        "Biggest effect on {kind} on average in layer {}".format(
-            np.argmax(np.mean(total_scores["last_subj_token"], axis=0))
+        "Biggest effect on {} on average in layer {}".format(
+            kind, np.argmax(np.mean(total_scores["last_subj_token"], axis=0))
         )
     )
     wandb.summary[f"{kind}_avg_best_layer"] = np.argmax(
