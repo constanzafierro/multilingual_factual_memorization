@@ -335,7 +335,7 @@ def plot_hidden_flow(mt, ds, cache_output_dir, pdf_output_dir, kind, noise_level
             ]
         ),
         [
-            (k, len(total_scores(k)))
+            (k, len(total_scores[k]))
             for k in [
                 "before_subj",
                 "first_subj_token",
