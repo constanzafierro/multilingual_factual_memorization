@@ -1,3 +1,10 @@
+"""Reads the mpararel files data and pushes it to HuggingFace.
+
+- It adds aliases to the objects in mParaRel
+- If --ensure_crosslingual is used then each relation will contain the subset
+of subjects that are present in all the languages.
+"""
+
 import argparse
 import collections
 import os

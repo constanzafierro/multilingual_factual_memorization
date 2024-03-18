@@ -33,8 +33,6 @@ from third_party.rome.experiments.causal_trace import (
 )
 from third_party.rome.util import nethook
 
-LANG_TO_FONT = {"ja": "TakaoGothic"}
-
 torch.set_grad_enabled(False)
 
 
@@ -321,8 +319,12 @@ def plot_hidden_flow(mt, ds, cache_output_dir, pdf_output_dir, kind, noise_level
             total_scores["before_subj"].append(numpy_result["scores"][i])
         for i in range(first_subj_token + 1, last_subj_token):
             total_scores["mid_subj_tokens"].append(numpy_result["scores"][i])
-        for i in range(numpy_result["subject_range"][-1], len(numpy_result["scores"])):
+        for i in range(last_subj_token, len(numpy_result["scores"]) - 1):
             total_scores["after_subj"].append(numpy_result["scores"][i])
+        for i in range(len(numpy_result["scores"]) - 1):
+            total_scores["after_subj_last"].append(
+                numpy_result["scores"][last_subj_token]
+            )
         total_scores["low_score"].append(numpy_result["low_score"])
     plot_averages(
         np.array(
@@ -369,9 +371,6 @@ def main(args):
     wandb.config["plots_output_dir"] = pdf_output_dir
     os.makedirs(cache_output_dir, exist_ok=True)
     os.makedirs(pdf_output_dir, exist_ok=True)
-
-    if args.language in LANG_TO_FONT:
-        plt.rcParams["font.family"] = LANG_TO_FONT[args.language]
 
     mt = load_model_and_tok(args)
     print("Testing prediction...")
