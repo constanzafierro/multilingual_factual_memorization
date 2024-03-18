@@ -63,23 +63,6 @@ def ensure_crosslingual(ds, args):
     )
 
 
-def filter_trivial_examples(ds):
-    def is_trivial_example(ex):
-        objs = ex["obj_label"]
-        if not isinstance(objs, list):
-            objs = [objs]
-        for obj in objs:
-            if obj.lower() in ex["query"].lower():
-                True
-        return False
-
-    filtered = ds.filter(lambda ex: not is_trivial_example(ex))
-    if wandb.run is not None:
-        wandb.run.summary["trivial_filter/size_before"] = len(ds)
-        wandb.run.summary["trivial_filter/size_after"] = len(filtered)
-    return filtered
-
-
 def get_subject_object_data(args, lang, relation_filename):
     if args.use_aliases_folder:
         return get_mpararel_subject_object_aliases(
@@ -129,7 +112,6 @@ def main(args):
                     ]
                 )
     ds = Dataset.from_list(dataset)
-    ds = filter_trivial_examples(ds)
     if args.ensure_crosslingual:
         ds = ensure_crosslingual(ds, args)
     print(

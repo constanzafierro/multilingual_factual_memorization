@@ -253,26 +253,64 @@ def get_memorized_ds(dataset_name, eval_df_filename):
                 start_idx = id_found
         return start_idx
 
-    def add_exact_query(example, memorized_df):
-        row = memorized_df.id == example["id"]
+    def add_exact_query(example, memorized_df, df_id_to_index):
+        row = df_id_to_index[example["id"]]
         start_index = memorized_df[row]["start_answer"].item()
         if start_index != 0:
-            example["query_inference"] = (
-                example["query"] + memorized_df[row]["prediction"].item()[:start_index]
-            )
+            try:
+                example["query_inference"] = (
+                    example["query"]
+                    + memorized_df[row]["prediction"].item()[:start_index]
+                )
+            except Exception as e:
+                print("row", row, "/ start_index", start_index)
+                print("prediction", memorized_df[row]["prediction"])
+                raise (e)
         else:
             example["query_inference"] = example["query"]
         return example
 
+    def is_trivial_example(ex):
+        objs = ex["ground_truth"]
+        if not isinstance(objs, list):
+            objs = [objs]
+        query = ex["query"].lower()
+        for possible_ans in objs:
+            if possible_ans.lower() in query:
+                return True
+        return False
+
     inference_df = pd.read_json(eval_df_filename)
     memorized_df = inference_df[inference_df.exact_match].copy()
-    memorized_df["start_answer"] = memorized_df.apply(
-        lambda ex: get_start_ans(ex["prediction"], ex["ground_truth"]), axis=1
-    )
     memorized_ids = set(memorized_df["id"].values)
     ds = load_dataset(dataset_name)["train"]
     ds = ds.filter(lambda ex: ex["id"] in memorized_ids)
-    ds = ds.map(partial(add_exact_query, memorized_df=memorized_df))
+
+    # Check how many trivial.
+    ds_id_to_index = {ex["id"]: i for i, ex in enumerate(ds)}
+    memorized_df["query"] = memorized_df.apply(
+        lambda row: ds[ds_id_to_index[row["id"]]]["query"], axis=1
+    )
+    memorized_df["is_trivial"] = memorized_df.apply(
+        lambda row: is_trivial_example(row), axis=1
+    )
+    wandb.log(
+        {
+            "trivial_memorization": len(memorized_df[memorized_df.is_trivial])
+            / len(memorized_df)
+        }
+    )
+
+    # Add 'query_inference' with all the tokens before the object.
+    df_id_to_index = {id_: i for i, id_ in enumerate(memorized_df.id)}
+    memorized_df["start_answer"] = memorized_df.apply(
+        lambda ex: get_start_ans(ex["prediction"], ex["ground_truth"]), axis=1
+    )
+    ds = ds.map(
+        partial(
+            add_exact_query, memorized_df=memorized_df, df_id_to_index=df_id_to_index
+        )
+    )
     return ds
 
 
