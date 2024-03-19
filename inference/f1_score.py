@@ -29,6 +29,8 @@ def normalize_answer(s):
 def f1_score(prediction, ground_truth):
     # TODO: replace \\n for \n?
     gt = normalize_answer(ground_truth)
+    if not gt:
+        return 0
     prediction_tokens = normalize_answer(prediction)[: len(gt)].split()
     ground_truth_tokens = gt.split()
     common = Counter(prediction_tokens) & Counter(ground_truth_tokens)
@@ -43,6 +45,8 @@ def f1_score(prediction, ground_truth):
 
 def exact_match_score(prediction, ground_truth):
     gt = normalize_answer(ground_truth)
+    if not gt:
+        return 0
     return normalize_answer(prediction)[: len(gt)] == gt
 
 
