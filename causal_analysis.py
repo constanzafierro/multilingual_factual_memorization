@@ -1,21 +1,20 @@
 import argparse
 import collections
 import os
+import string
 from collections import defaultdict
 from functools import partial
+from glob import glob
 
 import numpy
 import numpy as np
 import pandas as pd
 import torch
 import wandb
-from accelerate import Accelerator, init_empty_weights, load_checkpoint_and_dispatch
 from datasets import load_dataset
 from matplotlib import pyplot as plt
 from tqdm import tqdm
-from glob import glob
 from transformers import (
-    AutoConfig,
     AutoModelForCausalLM,
     AutoTokenizer,
     LlamaForCausalLM,
@@ -117,6 +116,8 @@ def find_token_range(tokenizer, token_array, subject):
             token_array[i : i + len(subj_tokens)] == subj_tokens
         ):
             return i, i + len(subj_tokens)
+    if subject[-1] in string.punctuation:
+        return find_token_range(tokenizer, token_array, subject[-1])
     raise Exception(
         "Did not find subj_tokens={} in token_array={}".format(subj_tokens, token_array)
     )
