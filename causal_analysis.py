@@ -259,7 +259,7 @@ def get_memorized_ds(dataset_name, eval_df_filename):
         if start_index != 0:
             try:
                 example["query_inference"] = (
-                    example["query"] + row["prediction"].item()[:start_index]
+                    example["query"] + row["prediction"][:start_index]
                 )
             except Exception as e:
                 print("row", row)
