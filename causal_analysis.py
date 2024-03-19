@@ -372,6 +372,7 @@ def plot_hidden_flow(mt, ds, cache_output_dir, pdf_output_dir, kind, noise_level
                 np.mean(total_scores["mid_subj_tokens"], axis=0),
                 np.mean(total_scores["last_subj_token"], axis=0),
                 np.mean(total_scores["after_subj"], axis=0),
+                np.mean(total_scores["after_subj_last"], axis=0),
             ]
         ),
         [
@@ -382,6 +383,7 @@ def plot_hidden_flow(mt, ds, cache_output_dir, pdf_output_dir, kind, noise_level
                 "mid_subj_tokens",
                 "last_subj_token",
                 "after_subj",
+                "after_subj_last",
             ]
         ],
         np.mean(total_scores["low_score"]),
