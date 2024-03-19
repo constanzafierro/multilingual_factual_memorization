@@ -389,7 +389,7 @@ def plot_hidden_flow(mt, ds, cache_output_dir, pdf_output_dir, kind, noise_level
         np.mean(total_scores["low_score"]),
         args.model_name,
         kind,
-        savepdf=os.path.join(pdf_output_dir, "avg.pdf"),
+        savepdf=os.path.join(pdf_output_dir, f"avg_{kind}.pdf"),
     )
     print(
         "Biggest effect on {} on average in layer {}".format(
