@@ -11,6 +11,7 @@ import numpy as np
 import pandas as pd
 import torch
 import wandb
+from accelerate import Accelerator
 from datasets import load_dataset
 from matplotlib import pyplot as plt
 from tqdm import tqdm
