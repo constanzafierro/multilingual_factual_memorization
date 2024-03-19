@@ -254,17 +254,17 @@ def get_memorized_ds(dataset_name, eval_df_filename):
         return start_idx
 
     def add_exact_query(example, memorized_df, df_id_to_index):
-        row = df_id_to_index[example["id"]]
-        start_index = memorized_df[row]["start_answer"].item()
+        row = memorized_df.iloc[df_id_to_index[example["id"]]]
+        start_index = row["start_answer"].item()
         if start_index != 0:
             try:
                 example["query_inference"] = (
-                    example["query"]
-                    + memorized_df[row]["prediction"].item()[:start_index]
+                    example["query"] + row["prediction"].item()[:start_index]
                 )
             except Exception as e:
-                print("row", row, "/ start_index", start_index)
-                print("prediction", memorized_df[row]["prediction"])
+                print("row", row)
+                print("start_index", start_index)
+                print("prediction", row["prediction"])
                 raise (e)
         else:
             example["query_inference"] = example["query"]
@@ -302,7 +302,7 @@ def get_memorized_ds(dataset_name, eval_df_filename):
     )
 
     # Add 'query_inference' with all the tokens before the object.
-    df_id_to_index = {id_: i for i, id_ in enumerate(memorized_df.id)}
+    df_id_to_index = {id_: i for i, id_ in enumerate(memorized_df.id.values)}
     memorized_df["start_answer"] = memorized_df.apply(
         lambda ex: get_start_ans(ex["prediction"], ex["ground_truth"]), axis=1
     )
