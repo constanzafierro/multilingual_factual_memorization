@@ -246,6 +246,10 @@ def plot_averages(differences, names_and_counts, low_score, modelname, kind, sav
 
 
 def get_memorized_ds(dataset_name, eval_df_filename):
+    def remove_punc(text):
+        exclude = set(string.punctuation)
+        return "".join(ch for ch in text if ch not in exclude)
+
     def get_start_ans(pred, gt_list):
         start_idx = None
         pred = pred.lower()
@@ -253,6 +257,9 @@ def get_memorized_ds(dataset_name, eval_df_filename):
             id_found = pred.find(gt.lower())
             if id_found != -1 and (start_idx is None or start_idx > id_found):
                 start_idx = id_found
+        gt_without_punc = [remove_punc(gt) for gt in gt_list]
+        if start_idx is None and gt_list != gt_without_punc:
+            return get_start_ans(remove_punc(pred), gt_without_punc)
         return start_idx
 
     def add_exact_query(example, memorized_df, df_id_to_index):
@@ -308,6 +315,16 @@ def get_memorized_ds(dataset_name, eval_df_filename):
     memorized_df["start_answer"] = memorized_df.apply(
         lambda ex: get_start_ans(ex["prediction"], ex["ground_truth"]), axis=1
     )
+    if len(memorized_df[memorized_df.start_answer.isnull()]) > 0:
+        none_values = memorized_df[memorized_df.start_answer.isnull()]
+        print(
+            "Could not find the answer in the prediction for {} examples. "
+            "Data taken from: eval_df_filename={}, dataset_name={}".format(
+                len(none_values), eval_df_filename, dataset_name
+            )
+        )
+        wandb.run.summary["answer_not_found"] = len(none_values)
+        memorized_df = memorized_df[~memorized_df.start_answer.isnull()]
     ds = ds.map(
         partial(
             add_exact_query, memorized_df=memorized_df, df_id_to_index=df_id_to_index
