@@ -264,13 +264,14 @@ def get_memorized_ds(dataset_name, eval_df_filename):
 
     def add_exact_query(example, memorized_df, df_id_to_index):
         row = memorized_df.iloc[df_id_to_index[example["id"]]]
-        start_index = row["start_answer"].item()
+        start_index = int(row["start_answer"].item())
         if start_index != 0:
             try:
                 example["query_inference"] = (
                     example["query"] + row["prediction"][:start_index]
                 )
             except Exception as e:
+                print("example in ds", example["query"])
                 print("row", row)
                 print("start_index", start_index)
                 print("prediction", row["prediction"])
