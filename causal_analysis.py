@@ -449,6 +449,10 @@ def main(args):
         "eval_per_example_records.json",
     )
     ds = get_memorized_ds(args.dataset_name, eval_df_filename)
+    if args.only_subset:
+        total = max(1000, int(len(ds) * 0.1))
+        rng = np.random.default_rng(0)
+        ds = ds.select(rng.choice(len(ds), total, replace=False))
     print("Computing causal analysis for", len(ds))
     noise_level = 3 * collect_embedding_std(
         mt,
@@ -498,6 +502,7 @@ if __name__ == "__main__":
         type=str,
         help="",
     )
+    parser.add_argument("--only_subset", action="store_true")
     args = parser.parse_args()
     if not args.model_name:
         args.model_name = args.model_name_or_path.replace("/", "__")
