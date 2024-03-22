@@ -423,6 +423,8 @@ def plot_hidden_flow(mt, ds, cache_output_dir, pdf_output_dir, kind, noise_level
 
 def main(args):
     data_id = "_".join([args.language, args.dataset_name.split("/")[1]])
+    if args.only_subset:
+        args.output_folder = args.output_folder + "_subset"
     cache_output_dir = os.path.join(
         args.output_folder, args.model_name, data_id, "cache_hidden_flow"
     )
