@@ -291,9 +291,8 @@ def get_memorized_ds(dataset_name, eval_df_filename):
 
     inference_df = pd.read_json(eval_df_filename)
     memorized_df = inference_df[inference_df.exact_match].copy()
-    memorized_ids = set(memorized_df["id"].values)
     ds = load_dataset(dataset_name)["train"]
-    ds = ds.filter(lambda ex: ex["id"] in memorized_ids)
+    ds = ds.filter(lambda ex: ex["id"] in set(memorized_df["id"].values))
 
     # Check how many trivial.
     ds_id_to_index = {ex["id"]: i for i, ex in enumerate(ds)}
@@ -311,7 +310,6 @@ def get_memorized_ds(dataset_name, eval_df_filename):
     )
 
     # Add 'query_inference' with all the tokens before the object.
-    df_id_to_index = {id_: i for i, id_ in enumerate(memorized_df.id.values)}
     memorized_df["start_answer"] = memorized_df.apply(
         lambda ex: get_start_ans(ex["prediction"], ex["ground_truth"]), axis=1
     )
@@ -325,6 +323,8 @@ def get_memorized_ds(dataset_name, eval_df_filename):
         )
         wandb.run.summary["answer_not_found"] = len(none_values)
         memorized_df = memorized_df[~memorized_df.start_answer.isnull()]
+        ds = ds.filter(lambda ex: ex["id"] in set(memorized_df["id"].values))
+    df_id_to_index = {id_: i for i, id_ in enumerate(memorized_df.id.values)}
     ds = ds.map(
         partial(
             add_exact_query, memorized_df=memorized_df, df_id_to_index=df_id_to_index
