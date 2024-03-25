@@ -118,7 +118,7 @@ def find_token_range(tokenizer, token_array, subject):
         ):
             return i, i + len(subj_tokens)
     if subject[-1] in string.punctuation:
-        return find_token_range(tokenizer, token_array, subject[-1])
+        return find_token_range(tokenizer, token_array, subject[:-1])
     raise Exception(
         "Did not find subj_tokens={} in token_array={}".format(subj_tokens, token_array)
     )
