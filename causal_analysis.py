@@ -117,8 +117,12 @@ def find_token_range(tokenizer, token_array, subject):
             token_array[i : i + len(subj_tokens)] == subj_tokens
         ):
             return i, i + len(subj_tokens)
-    if subject[-1] in string.punctuation:
-        return find_token_range(tokenizer, token_array, subject[:-1])
+    if subject[-1] in string.punctuation or subject[-1].isdigit():
+        for i in range(len(token_array)):
+            if i + len(subj_tokens) <= len(token_array) and np.all(
+                token_array[i : i + len(subj_tokens) - 1] == subj_tokens[:-1]
+            ):
+                return i, i + len(subj_tokens)
     raise Exception(
         "Did not find subj_tokens={} in token_array={}".format(subj_tokens, token_array)
     )
