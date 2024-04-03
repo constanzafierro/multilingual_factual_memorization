@@ -338,33 +338,7 @@ def get_memorized_ds(dataset_name, eval_df_filename):
     return ds
 
 
-def plot_hidden_flow(mt, ds, cache_output_dir, pdf_output_dir, kind, noise_level):
-    for ex in tqdm(ds, desc="Examples"):
-        ex_id = ex["id"]
-        filename = os.path.join(cache_output_dir, f"{ex_id}{kind}.npz")
-        if not os.path.isfile(filename):
-            result = calculate_hidden_flow(
-                mt,
-                ex["query_inference"],
-                ex["sub_label"],
-                noise=noise_level,
-                kind=kind,
-            )
-            numpy_result = {
-                k: v.detach().cpu().numpy() if torch.is_tensor(v) else v
-                for k, v in result.items()
-            }
-            np.savez(filename, **numpy_result)
-        else:
-            numpy_result = np.load(filename, allow_pickle=True)
-        plot_result = dict(numpy_result)
-        plot_result["kind"] = kind
-        pdfname = os.path.join(
-            pdf_output_dir, f'{str(numpy_result["answer"]).strip()}_{ex_id}_{kind}.pdf'
-        )
-        plot_trace_heatmap(numpy_result, savepdf=pdfname, modelname=args.model_name)
-
-    # Save plot of average.
+def plot_average_trace_heatmap(cache_output_dir, pdf_output_dir, kind):
     total_scores = collections.defaultdict(list)
     files = glob(os.path.join(cache_output_dir, f"*{kind}.npz"))
     for results_file in files:
@@ -430,6 +404,36 @@ def plot_hidden_flow(mt, ds, cache_output_dir, pdf_output_dir, kind, noise_level
     )
 
 
+def plot_hidden_flow(mt, ds, cache_output_dir, pdf_output_dir, kind, noise_level):
+    for ex in tqdm(ds, desc="Examples"):
+        ex_id = ex["id"]
+        filename = os.path.join(cache_output_dir, f"{ex_id}{kind}.npz")
+        if not os.path.isfile(filename):
+            result = calculate_hidden_flow(
+                mt,
+                ex["query_inference"],
+                ex["sub_label"],
+                noise=noise_level,
+                kind=kind,
+            )
+            numpy_result = {
+                k: v.detach().cpu().numpy() if torch.is_tensor(v) else v
+                for k, v in result.items()
+            }
+            np.savez(filename, **numpy_result)
+        else:
+            numpy_result = np.load(filename, allow_pickle=True)
+        plot_result = dict(numpy_result)
+        plot_result["kind"] = kind
+        pdfname = os.path.join(
+            pdf_output_dir, f'{str(numpy_result["answer"]).strip()}_{ex_id}_{kind}.pdf'
+        )
+        plot_trace_heatmap(numpy_result, savepdf=pdfname, modelname=args.model_name)
+
+    # Save plot of average.
+    plot_average_trace_heatmap(cache_output_dir, pdf_output_dir, kind)
+
+
 def main(args):
     data_id = "_".join([args.language, args.dataset_name.split("/")[1]])
     if args.only_subset:
@@ -482,6 +486,9 @@ def main(args):
     print(f"Using noise level {noise_level}")
     for kind in [None, "mlp", "attn"]:
         print("Computing for", kind)
+        if args.only_plot_average:
+            plot_average_trace_heatmap(cache_hidden_flow, pdf_output_dir, kind)
+            continue
         plot_hidden_flow(mt, ds, cache_hidden_flow, pdf_output_dir, kind, noise_level)
 
 
@@ -524,6 +531,7 @@ if __name__ == "__main__":
     )
     parser.add_argument("--only_subset", action="store_true")
     parser.add_argument("--override_noise_level", type=float, help="")
+    parser.add_argument("--only_plot_average", action="store_true")
     args = parser.parse_args()
     if not args.model_name:
         args.model_name = args.model_name_or_path.replace("/", "__")
