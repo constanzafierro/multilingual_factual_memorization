@@ -459,6 +459,7 @@ def main(args):
         f"{args.language}--{args.dataset_name.split('/')[1]}--{args.model_name}",
         "eval_per_example_records.json",
     )
+    wandb.config["eval_df_filename"] = eval_df_filename
     ds = get_memorized_ds(args.dataset_name, eval_df_filename)
     if args.only_subset:
         total = max(1000, int(len(ds) * 0.1))
