@@ -381,12 +381,13 @@ def plot_hidden_flow(mt, ds, cache_output_dir, pdf_output_dir, kind, noise_level
             total_scores["before_subj"].append(numpy_result["scores"][i])
         for i in range(first_subj_token + 1, last_subj_token):
             total_scores["mid_subj_tokens"].append(numpy_result["scores"][i])
-        for i in range(last_subj_token, len(numpy_result["scores"]) - 1):
-            total_scores["after_subj"].append(numpy_result["scores"][i])
-        for i in range(len(numpy_result["scores"]) - 1):
-            total_scores["after_subj_last"].append(
-                numpy_result["scores"][last_subj_token]
-            )
+        for i in range(first_subj_token, last_subj_token + 1):
+            total_scores["all_subj_tokens"].append(numpy_result["scores"][i])
+        if last_subj_token < len(numpy_result["scores"]) - 1:
+            for i in range(last_subj_token, len(numpy_result["scores"])):
+                total_scores["after_subj"].append(numpy_result["scores"][i])
+            total_scores["after_subj_last"].append(numpy_result["scores"][-1])
+        total_scores["last_token"].append(numpy_result["scores"][-1])
         total_scores["low_score"].append(numpy_result["low_score"])
     plot_averages(
         np.array(
@@ -395,8 +396,10 @@ def plot_hidden_flow(mt, ds, cache_output_dir, pdf_output_dir, kind, noise_level
                 np.mean(total_scores["first_subj_token"], axis=0),
                 np.mean(total_scores["mid_subj_tokens"], axis=0),
                 np.mean(total_scores["last_subj_token"], axis=0),
+                np.mean(total_scores["all_subj_tokens"], axis=0),
                 np.mean(total_scores["after_subj"], axis=0),
                 np.mean(total_scores["after_subj_last"], axis=0),
+                np.mean(total_scores["last_token"], axis=0),
             ]
         ),
         [
@@ -406,8 +409,10 @@ def plot_hidden_flow(mt, ds, cache_output_dir, pdf_output_dir, kind, noise_level
                 "first_subj_token",
                 "mid_subj_tokens",
                 "last_subj_token",
+                "all_subj_tokens",
                 "after_subj",
                 "after_subj_last",
+                "last_token",
             ]
         ],
         np.mean(total_scores["low_score"]),
