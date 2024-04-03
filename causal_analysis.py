@@ -428,14 +428,21 @@ def plot_hidden_flow(mt, ds, cache_output_dir, pdf_output_dir, kind, noise_level
 def main(args):
     data_id = "_".join([args.language, args.dataset_name.split("/")[1]])
     if args.only_subset:
-        args.output_folder = args.output_folder + "_subset"
-    cache_output_dir = os.path.join(
+        data_id = data_id + "_subset"
+    cache_dir = os.path.join(args.output_folder, args.model_name, data_id)
+    if args.override_noise_level is not None:
+        cache_dir = os.path.join(
+            args.output_folder,
+            args.model_name,
+            data_id + f"_noise={args.override_noise_level}",
+        )
+    cache_hidden_flow = os.path.join(
         args.output_folder, args.model_name, data_id, "cache_hidden_flow"
     )
     pdf_output_dir = os.path.join(args.output_folder, args.model_name, data_id, "plots")
-    wandb.config["cache_output_dir"] = cache_output_dir
+    wandb.config["cache_output_dir"] = cache_dir
     wandb.config["plots_output_dir"] = pdf_output_dir
-    os.makedirs(cache_output_dir, exist_ok=True)
+    os.makedirs(cache_hidden_flow, exist_ok=True)
     os.makedirs(pdf_output_dir, exist_ok=True)
 
     mt = load_model_and_tok(args)
@@ -460,15 +467,18 @@ def main(args):
         rng = np.random.default_rng(0)
         ds = ds.select(rng.choice(len(ds), total, replace=False))
     print("Computing causal analysis for", len(ds))
-    noise_level = 3 * collect_embedding_std(
-        mt,
-        [ex["sub_label"] for ex in ds],
-        subjects_from_ds=data_id,
-    )
+    if args.override_noise_level is not None:
+        noise_level = args.override_noise_level
+    else:
+        noise_level = 3 * collect_embedding_std(
+            mt,
+            [ex["sub_label"] for ex in ds],
+            subjects_from_ds=data_id,
+        )
     print(f"Using noise level {noise_level}")
     for kind in [None, "mlp", "attn"]:
         print("Computing for", kind)
-        plot_hidden_flow(mt, ds, cache_output_dir, pdf_output_dir, kind, noise_level)
+        plot_hidden_flow(mt, ds, cache_hidden_flow, pdf_output_dir, kind, noise_level)
 
 
 if __name__ == "__main__":
@@ -509,6 +519,7 @@ if __name__ == "__main__":
         help="",
     )
     parser.add_argument("--only_subset", action="store_true")
+    parser.add_argument("--override_noise_level", type=float, help="")
     args = parser.parse_args()
     if not args.model_name:
         args.model_name = args.model_name_or_path.replace("/", "__")
