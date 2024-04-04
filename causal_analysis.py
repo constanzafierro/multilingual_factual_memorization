@@ -298,6 +298,7 @@ def get_memorized_ds(dataset_name, eval_df_filename):
     memorized_df = inference_df[inference_df.exact_match].copy()
     ds = load_dataset(dataset_name)["train"]
     ds = ds.filter(lambda ex: ex["id"] in set(memorized_df["id"].values))
+    memorized_df = memorized_df[memorized_df["id"].isin(set(ds["id"]))]
 
     # Check how many trivial.
     ds_id_to_index = {ex["id"]: i for i, ex in enumerate(ds)}
