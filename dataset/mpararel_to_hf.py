@@ -112,6 +112,12 @@ def main(args):
                     ]
                 )
     ds = Dataset.from_list(dataset)
+    if not args.keep_all_templates:
+        en_templates = set(ds.filter(lambda ex: ex["language"] == "en")["template"])
+        # Some of the automatic translators used simply returned the template in english.
+        ds = ds.filter(
+            lambda ex: ex["language"] == "en" or ex["template"] not in en_templates
+        )
     if args.ensure_crosslingual:
         ds = ensure_crosslingual(ds, args)
     print(
@@ -136,6 +142,7 @@ if __name__ == "__main__":
     parser.add_argument("--ensure_crosslingual", action="store_true")
     parser.add_argument("--mask_lm", action="store_true")
     parser.add_argument("--use_aliases_folder", action="store_true")
+    parser.add_argument("--keep_all_templates", action="store_true")
     args = parser.parse_args()
 
     wandb.init(project="push_hf_xlingual_ds", name=args.hf_dataset_name)
