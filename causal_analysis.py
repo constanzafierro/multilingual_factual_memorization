@@ -471,7 +471,7 @@ def main(args):
     )
     wandb.config["eval_df_filename"] = eval_df_filename
     ds = get_memorized_ds(args.dataset_name, eval_df_filename)
-    if args.only_subset:
+    if args.only_subset and len(ds) > 1000:
         total = max(1000, int(len(ds) * 0.1))
         rng = np.random.default_rng(0)
         ds = ds.select(rng.choice(len(ds), total, replace=False))
