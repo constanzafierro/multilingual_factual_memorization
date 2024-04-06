@@ -544,7 +544,7 @@ if __name__ == "__main__":
                 args.model_name,
                 args.language,
                 (
-                    args.override_noise_level
+                    f"noise={args.override_noise_level}"
                     if args.override_noise_level is not None
                     else ""
                 ),
