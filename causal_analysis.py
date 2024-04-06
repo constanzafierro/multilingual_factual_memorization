@@ -298,6 +298,7 @@ def get_memorized_ds(dataset_name, eval_df_filename):
     memorized_df = inference_df[inference_df.exact_match].copy()
     ds = load_dataset(dataset_name)["train"]
     ds = ds.filter(lambda ex: ex["id"] in set(memorized_df["id"].values))
+    # We might have run inference on more examples than the ones in the ds that we want to use.
     memorized_df = memorized_df[memorized_df["id"].isin(set(ds["id"]))]
 
     # Check how many trivial.
@@ -538,7 +539,17 @@ if __name__ == "__main__":
         args.model_name = args.model_name_or_path.replace("/", "__")
     wandb.init(
         project="causal_analysis_mpararel",
-        name=" ".join([args.model_name, args.language]),
+        name=" ".join(
+            [
+                args.model_name,
+                args.language,
+                (
+                    args.override_noise_level
+                    if args.override_noise_level is not None
+                    else ""
+                ),
+            ]
+        ),
         config=args,
     )
     main(args)
