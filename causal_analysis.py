@@ -109,23 +109,41 @@ def trace_with_patch(
     return probs
 
 
-def find_token_range(tokenizer, token_array, subject):
-    subj_tokens = tokenizer.convert_tokens_to_ids(tokenizer.tokenize(subject))
-    token_array = np.array(token_array.cpu())
-    for i in range(len(token_array)):
-        if i + len(subj_tokens) <= len(token_array) and np.all(
-            token_array[i : i + len(subj_tokens)] == subj_tokens
+def find_token_range(tokenizer, token_ids_array, subject):
+    subj_tokens = tokenizer.tokenize(subject)
+    subj_token_ids = tokenizer.convert_tokens_to_ids(subj_tokens)
+    token_ids_array = np.array(token_ids_array.cpu())
+    for i in range(len(token_ids_array)):
+        if i + len(subj_token_ids) <= len(token_ids_array) and np.all(
+            token_ids_array[i : i + len(subj_token_ids)] == subj_token_ids
         ):
-            return i, i + len(subj_tokens)
+            return i, i + len(subj_token_ids)
     if subject[-1] in string.punctuation or subject[-1].isdigit():
-        for i in range(len(token_array)):
-            if i + len(subj_tokens) <= len(token_array) and np.all(
-                token_array[i : i + len(subj_tokens) - 1] == subj_tokens[:-1]
+        for i in range(len(token_ids_array)):
+            if i + len(subj_token_ids) <= len(token_ids_array) and np.all(
+                token_ids_array[i : i + len(subj_token_ids) - 1] == subj_token_ids[:-1]
             ):
-                return i, i + len(subj_tokens)
-    raise Exception(
-        "Did not find subj_tokens={} in token_array={}".format(subj_tokens, token_array)
-    )
+                return i, i + len(subj_token_ids)
+    # If the above failed, we checked the tokens directly as in some languages
+    # (e.g. ko) the charachters get paired up differently when in the subject
+    # or in the template.
+    max_overlap = 0
+    overlap_index = -1
+    for i in range(len(token_ids_array)):
+        if i + len(subj_token_ids) > len(token_ids_array):
+            break
+        overlap = np.sum(token_ids_array[i : i + len(subj_token_ids)] == subj_token_ids)
+        if overlap > max_overlap:
+            max_overlap = overlap
+            overlap_index = i
+
+    remaining_subj = tokenizer.decode(subj_token_ids[max_overlap:])
+    last_subj_token = overlap_index + overlap + 1
+    while last_subj_token <= len(token_ids_array) and remaining_subj.startswith(
+        tokenizer.decode(token_ids_array[overlap_index + max_overlap : last_subj_token])
+    ):
+        last_subj_token += 1
+    return overlap_index, last_subj_token
 
 
 def calculate_hidden_flow(
