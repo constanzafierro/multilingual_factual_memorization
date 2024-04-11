@@ -560,7 +560,6 @@ if __name__ == "__main__":
     )
     parser.add_argument(
         "--eval_dir",
-        required=True,
         type=str,
         help="",
     )
