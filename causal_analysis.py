@@ -237,7 +237,9 @@ def trace_important_window(
     return torch.stack(table)
 
 
-def plot_averages(differences, names_and_counts, low_score, modelname, kind, savepdf):
+def plot_averages(
+    differences, names_and_counts, low_score, high_score, modelname, kind, savepdf
+):
     window = 10
     fig, ax = plt.subplots(figsize=(3.5, 2), dpi=200)
     h = ax.pcolor(
@@ -245,7 +247,7 @@ def plot_averages(differences, names_and_counts, low_score, modelname, kind, sav
         cmap={None: "Purples", "None": "Purples", "mlp": "Greens", "attn": "Reds"}[
             kind
         ],
-        vmin=low_score,
+        vmin=differences.min(),
     )
     ax.invert_yaxis()
     ax.set_yticks([0.5 + i for i in range(len(differences))])
@@ -261,7 +263,19 @@ def plot_averages(differences, names_and_counts, low_score, modelname, kind, sav
             "Avg. impact of restoring {} after corrupted input".format(kindname)
         )
         ax.set_xlabel(f"Center of interval of {window} restored {kindname} layers")
-    plt.colorbar(h)
+    cb = plt.colorbar(h)
+    ticks = [
+        differences.min(),
+        low_score,
+        high_score,
+        differences.max(),
+    ]
+    tick_labels = [
+        "{:0.3} {}".format(ticks[i], label)
+        for i, label in enumerate(["(Min)", "(Noise)", "(Normal)", "(Max)"])
+    ]
+    cb.set_ticks(ticks)
+    cb.set_ticklabels(tick_labels)
     if savepdf:
         os.makedirs(os.path.dirname(savepdf), exist_ok=True)
         plt.savefig(savepdf, bbox_inches="tight")
@@ -386,6 +400,7 @@ def plot_average_trace_heatmap(cache_output_dir, pdf_output_dir, kind):
             total_scores["after_subj_last"].append(numpy_result["scores"][-1])
         total_scores["last_token"].append(numpy_result["scores"][-1])
         total_scores["low_score"].append(numpy_result["low_score"])
+        total_scores["low_score"].append(numpy_result["high_score"])
     plot_averages(
         np.array(
             [
@@ -413,6 +428,7 @@ def plot_average_trace_heatmap(cache_output_dir, pdf_output_dir, kind):
             ]
         ],
         np.mean(total_scores["low_score"]),
+        np.mean(total_scores["high_score"]),
         args.model_name,
         kind,
         savepdf=os.path.join(pdf_output_dir, f"avg_{kind}.pdf"),

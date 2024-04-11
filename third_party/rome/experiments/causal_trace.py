@@ -499,7 +499,7 @@ def layername(model, num, kind=None):
     if isinstance(model, XGLMForCausalLM):
         if kind == "embed":
             return "model.embed_tokens"
-        kind_map = {"attn": "self_attn", "mlp":"fc2"}
+        kind_map = {"attn": "self_attn", "mlp": "fc2"}
         return f'model.layers.{num}{"" if kind is None else "." + kind_map[kind]}'
     assert False, "unknown transformer structure"
 
@@ -557,7 +557,8 @@ def plot_trace_heatmap(result, savepdf=None, title=None, xlabel=None, modelname=
             cmap={None: "Purples", "None": "Purples", "mlp": "Greens", "attn": "Reds"}[
                 kind
             ],
-            vmin=low_score,
+            # vmin=low_score,
+            vmin=differences.min().item(),
         )
         ax.invert_yaxis()
         ax.set_yticks([0.5 + i for i in range(len(differences))])
@@ -574,6 +575,18 @@ def plot_trace_heatmap(result, savepdf=None, title=None, xlabel=None, modelname=
             ax.set_title(f"Impact of restoring {kindname} after corrupted input")
             ax.set_xlabel(f"center of interval of {window} restored {kindname} layers")
         cb = plt.colorbar(h)
+        ticks = [
+            differences.min().item(),
+            result["low_score"],
+            result["high_score"].item(),
+            differences.max().item(),
+        ]
+        tick_labels = [
+            "{:0.3} {}".format(ticks[i], label)
+            for i, label in enumerate(["(Min)", "(Noise)", "(Normal)", "(Max)"])
+        ]
+        cb.set_ticks(ticks)
+        cb.set_ticklabels(tick_labels)
         if title is not None:
             ax.set_title(title)
         if xlabel is not None:
@@ -653,7 +666,9 @@ def predict_from_input(model, inp):
 def collect_embedding_std(mt, subjects, subjects_from_ds=None):
     cache_filename = None
     if mt.model_name and subjects_from_ds:
-        cache_filename = os.path.join(DATA_DIR, f'rome_cache/{mt.model_name}_{subjects_from_ds}.txt')
+        cache_filename = os.path.join(
+            DATA_DIR, f"rome_cache/{mt.model_name}_{subjects_from_ds}.txt"
+        )
         if os.path.isfile(cache_filename):
             print("Using cache noise level from", cache_filename)
             with open(cache_filename) as f:
@@ -669,7 +684,7 @@ def collect_embedding_std(mt, subjects, subjects_from_ds=None):
     if cache_filename:
         print("Caching noise level to", cache_filename)
         os.makedirs(os.path.dirname(cache_filename), exist_ok=True)
-        with open(cache_filename, 'w') as f:
+        with open(cache_filename, "w") as f:
             f.write(str(noise_level))
     return noise_level
 
