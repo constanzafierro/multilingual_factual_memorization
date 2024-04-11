@@ -20,6 +20,8 @@ from transformers import (
     AutoTokenizer,
     LlamaForCausalLM,
 )
+from third_party.rome.util.globals import DATA_DIR
+from third_party.rome.dsets import KnownsDataset
 
 from third_party.rome.experiments.causal_trace import (
     ModelAndTokenizer,
@@ -159,6 +161,7 @@ def calculate_hidden_flow(
         answer_t, base_score = [d[0] for d in predict_from_input(mt.model, inp)]
     [answer] = decode_tokens(mt.tokenizer, [answer_t])
     e_range = find_token_range(mt.tokenizer, inp["input_ids"][0], subject)
+    # Add noise and make a forward pass.
     low_score = trace_with_patch(
         mt.model, inp, [], answer_t, e_range, noise=noise
     ).item()
@@ -454,6 +457,28 @@ def plot_hidden_flow(mt, ds, cache_output_dir, pdf_output_dir, kind, noise_level
     plot_average_trace_heatmap(cache_output_dir, pdf_output_dir, kind)
 
 
+def get_dataset(args):
+    if args.dataset_name == "known_facts_rome":
+        knowns = KnownsDataset(DATA_DIR)
+        ds = []
+        for k in knowns:
+            ds.append(
+                {
+                    "sub_label": k["subject"],
+                    "id": k["known_id"],
+                    "query_inference": k["prompt"],
+                }
+            )
+        return ds
+    eval_df_filename = os.path.join(
+        args.eval_dir,
+        f"{args.language}--{args.dataset_name.split('/')[1]}--{args.model_name}",
+        "eval_per_example_records.json",
+    )
+    wandb.config["eval_df_filename"] = eval_df_filename
+    return get_memorized_ds(args.dataset_name, eval_df_filename)
+
+
 def main(args):
     data_id = "_".join([args.language, args.dataset_name.split("/")[1]])
     if args.only_subset:
@@ -482,19 +507,14 @@ def main(args):
         )
     )
 
-    print("Computing noise level...")
-    eval_df_filename = os.path.join(
-        args.eval_dir,
-        f"{args.language}--{args.dataset_name.split('/')[1]}--{args.model_name}",
-        "eval_per_example_records.json",
-    )
-    wandb.config["eval_df_filename"] = eval_df_filename
-    ds = get_memorized_ds(args.dataset_name, eval_df_filename)
+    ds = get_dataset(args)
     if args.only_subset and len(ds) > 1000:
         total = max(1000, int(len(ds) * 0.1))
         rng = np.random.default_rng(0)
         ds = ds.select(rng.choice(len(ds), total, replace=False))
     print("Computing causal analysis for", len(ds))
+
+    print("Computing noise level...")
     if args.override_noise_level is not None:
         noise_level = args.override_noise_level
     else:
