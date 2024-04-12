@@ -272,7 +272,7 @@ def plot_averages(
             differences.max(),
         ]
     )
-    tick_labels = np.arrya(
+    tick_labels = np.array(
         [
             "{:0.3} {}".format(ticks[i], label)
             for i, label in enumerate(["(Min)", "(Noise)", "(Normal)", "(Max)"])
