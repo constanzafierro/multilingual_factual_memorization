@@ -4,7 +4,7 @@ import os
 import re
 from collections import defaultdict
 
-import numpy
+import numpy as np
 import torch
 from datasets import load_dataset
 from matplotlib import pyplot as plt
@@ -116,9 +116,9 @@ def main():
                     k: v.detach().cpu().numpy() if torch.is_tensor(v) else v
                     for k, v in result.items()
                 }
-                numpy.savez(filename, **numpy_result)
+                np.savez(filename, **numpy_result)
             else:
-                numpy_result = numpy.load(filename, allow_pickle=True)
+                numpy_result = np.load(filename, allow_pickle=True)
             if not numpy_result["correct_prediction"]:
                 tqdm.write(f"Skipping {knowledge['prompt']}")
                 continue
@@ -164,7 +164,7 @@ def trace_with_patch(
     any number of token indices and layers can be listed.
     """
 
-    rs = numpy.random.RandomState(1)  # For reproducibility, use pseudorandom noise
+    rs = np.random.RandomState(1)  # For reproducibility, use pseudorandom noise
     if uniform_noise:
         prng = lambda *shape: rs.uniform(-1, 1, shape)
     else:
@@ -239,7 +239,7 @@ def trace_with_repatch(
     noise=0.1,  # Level of noise to add
     uniform_noise=False,
 ):
-    rs = numpy.random.RandomState(1)  # For reproducibility, use pseudorandom noise
+    rs = np.random.RandomState(1)  # For reproducibility, use pseudorandom noise
     if uniform_noise:
         prng = lambda *shape: rs.uniform(-1, 1, shape)
     else:
@@ -552,13 +552,28 @@ def plot_trace_heatmap(result, savepdf=None, title=None, xlabel=None, modelname=
 
     with plt.rc_context():
         fig, ax = plt.subplots(figsize=(3.5, 2), dpi=200)
+        ticks = np.array(
+            [
+                differences.min().item(),
+                result["low_score"],
+                result["high_score"].item(),
+                differences.max().item(),
+            ]
+        )
+        tick_labels = np.array(
+            [
+                "{:0.3} {}".format(ticks[i], label)
+                for i, label in enumerate(["(Min)", "(Noise)", "(Normal)", "(Max)"])
+            ]
+        )
         h = ax.pcolor(
             differences,
             cmap={None: "Purples", "None": "Purples", "mlp": "Greens", "attn": "Reds"}[
                 kind
             ],
             # vmin=low_score,
-            vmin=differences.min().item(),
+            vmin=min(ticks),
+            vmax=max(ticks),
         )
         ax.invert_yaxis()
         ax.set_yticks([0.5 + i for i in range(len(differences))])
@@ -575,18 +590,8 @@ def plot_trace_heatmap(result, savepdf=None, title=None, xlabel=None, modelname=
             ax.set_title(f"Impact of restoring {kindname} after corrupted input")
             ax.set_xlabel(f"center of interval of {window} restored {kindname} layers")
         cb = plt.colorbar(h)
-        ticks = [
-            differences.min().item(),
-            result["low_score"],
-            result["high_score"].item(),
-            differences.max().item(),
-        ]
-        tick_labels = [
-            "{:0.3} {}".format(ticks[i], label)
-            for i, label in enumerate(["(Min)", "(Noise)", "(Normal)", "(Max)"])
-        ]
-        cb.set_ticks(ticks)
-        cb.set_ticklabels(tick_labels)
+        cb.set_ticks(ticks[np.argsort(ticks)])
+        cb.set_ticklabels(tick_labels[np.argsort(ticks)])
         if title is not None:
             ax.set_title(title)
         if xlabel is not None:
@@ -765,7 +770,7 @@ def collect_embedding_tdist(mt, degree=3):
     # reduce cov by a factor of (degree - 2) / degree.
     # In other words we should be sampling sqrt(degree - 2 / u) * sample.
     u_sample = torch.from_numpy(
-        numpy.random.RandomState(2).chisquare(df=degree, size=1000)
+        np.random.RandomState(2).chisquare(df=degree, size=1000)
     )
     fixed_sample = ((degree - 2) / u_sample).sqrt()
     mvg = collect_embedding_gaussian(mt)

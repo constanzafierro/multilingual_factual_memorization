@@ -242,12 +242,27 @@ def plot_averages(
 ):
     window = 10
     fig, ax = plt.subplots(figsize=(3.5, 2), dpi=200)
+    ticks = np.array(
+        [
+            differences.min(),
+            low_score,
+            high_score,
+            differences.max(),
+        ]
+    )
+    tick_labels = np.array(
+        [
+            "{:0.3} {}".format(ticks[i], label)
+            for i, label in enumerate(["(Min)", "(Noise)", "(Normal)", "(Max)"])
+        ]
+    )
     h = ax.pcolor(
         differences,
         cmap={None: "Purples", "None": "Purples", "mlp": "Greens", "attn": "Reds"}[
             kind
         ],
-        vmin=differences.min(),
+        vmax=max(ticks),
+        vmin=min(ticks),
     )
     ax.invert_yaxis()
     ax.set_yticks([0.5 + i for i in range(len(differences))])
@@ -264,20 +279,6 @@ def plot_averages(
         )
         ax.set_xlabel(f"Center of interval of {window} restored {kindname} layers")
     cb = plt.colorbar(h)
-    ticks = np.array(
-        [
-            differences.min(),
-            low_score,
-            high_score,
-            differences.max(),
-        ]
-    )
-    tick_labels = np.array(
-        [
-            "{:0.3} {}".format(ticks[i], label)
-            for i, label in enumerate(["(Min)", "(Noise)", "(Normal)", "(Max)"])
-        ]
-    )
     cb.set_ticks(ticks[np.argsort(ticks)])
     cb.set_ticklabels(tick_labels[np.argsort(ticks)])
     if savepdf:
@@ -379,7 +380,7 @@ def get_memorized_ds(dataset_name, eval_df_filename):
     return ds
 
 
-def plot_average_trace_heatmap(cache_output_dir, pdf_output_dir, kind):
+def plot_average_trace_heatmap(cache_output_dir, pdf_output_dir, kind, model_name):
     total_scores = collections.defaultdict(list)
     files = glob(os.path.join(cache_output_dir, f"*{kind}.npz"))
     for results_file in files:
@@ -433,7 +434,7 @@ def plot_average_trace_heatmap(cache_output_dir, pdf_output_dir, kind):
         ],
         np.mean(total_scores["low_score"]),
         np.mean(total_scores["high_score"]),
-        args.model_name,
+        model_name,
         kind,
         savepdf=os.path.join(pdf_output_dir, f"avg_{kind}.pdf"),
     )
@@ -442,9 +443,10 @@ def plot_average_trace_heatmap(cache_output_dir, pdf_output_dir, kind):
             kind, np.argmax(np.mean(total_scores["last_subj_token"], axis=0))
         )
     )
-    wandb.summary[f"{kind}_avg_best_layer"] = np.argmax(
-        np.mean(total_scores["last_subj_token"], axis=0)
-    )
+    if wandb.run is not None:
+        wandb.summary[f"{kind}_avg_best_layer"] = np.argmax(
+            np.mean(total_scores["last_subj_token"], axis=0)
+        )
 
 
 def plot_hidden_flow(mt, ds, cache_output_dir, pdf_output_dir, kind, noise_level):
@@ -471,10 +473,10 @@ def plot_hidden_flow(mt, ds, cache_output_dir, pdf_output_dir, kind, noise_level
         pdfname = os.path.join(
             pdf_output_dir, f'{str(numpy_result["answer"]).strip()}_{ex_id}_{kind}.pdf'
         )
-        plot_trace_heatmap(numpy_result, savepdf=pdfname, modelname=args.model_name)
+        plot_trace_heatmap(numpy_result, savepdf=pdfname, modelname=mt.model_name)
 
     # Save plot of average.
-    plot_average_trace_heatmap(cache_output_dir, pdf_output_dir, kind)
+    plot_average_trace_heatmap(cache_output_dir, pdf_output_dir, kind, mt.model_name)
 
 
 def get_dataset(args):
@@ -556,7 +558,9 @@ def main(args):
     for kind in [None, "mlp", "attn"]:
         print("Computing for", kind)
         if args.only_plot_average:
-            plot_average_trace_heatmap(cache_hidden_flow, pdf_output_dir, kind)
+            plot_average_trace_heatmap(
+                cache_hidden_flow, pdf_output_dir, kind, mt.model_name
+            )
             continue
         plot_hidden_flow(mt, ds, cache_hidden_flow, pdf_output_dir, kind, noise_level)
 
