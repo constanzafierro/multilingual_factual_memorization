@@ -264,18 +264,22 @@ def plot_averages(
         )
         ax.set_xlabel(f"Center of interval of {window} restored {kindname} layers")
     cb = plt.colorbar(h)
-    ticks = [
-        differences.min(),
-        low_score,
-        high_score,
-        differences.max(),
-    ]
-    tick_labels = [
-        "{:0.3} {}".format(ticks[i], label)
-        for i, label in enumerate(["(Min)", "(Noise)", "(Normal)", "(Max)"])
-    ]
-    cb.set_ticks(ticks)
-    cb.set_ticklabels(tick_labels)
+    ticks = np.array(
+        [
+            differences.min(),
+            low_score,
+            high_score,
+            differences.max(),
+        ]
+    )
+    tick_labels = np.arrya(
+        [
+            "{:0.3} {}".format(ticks[i], label)
+            for i, label in enumerate(["(Min)", "(Noise)", "(Normal)", "(Max)"])
+        ]
+    )
+    cb.set_ticks(ticks[np.argsort(ticks)])
+    cb.set_ticklabels(tick_labels[np.argsort(ticks)])
     if savepdf:
         os.makedirs(os.path.dirname(savepdf), exist_ok=True)
         plt.savefig(savepdf, bbox_inches="tight")
