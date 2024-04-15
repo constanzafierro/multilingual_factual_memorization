@@ -240,53 +240,60 @@ def trace_important_window(
 def plot_averages(
     differences, names_and_counts, low_score, high_score, modelname, kind, savepdf
 ):
-    window = 10
-    fig, ax = plt.subplots(figsize=(3.5, 2), dpi=200)
-    ticks = np.array(
-        [
-            differences.min(),
-            low_score,
-            high_score,
-            differences.max(),
-        ]
-    )
-    tick_labels = np.array(
-        [
-            "{:0.3} {}".format(ticks[i], label)
-            for i, label in enumerate(["(Min)", "(Noise)", "(Normal)", "(Max)"])
-        ]
-    )
-    h = ax.pcolor(
-        differences,
-        cmap={None: "Purples", "None": "Purples", "mlp": "Greens", "attn": "Reds"}[
-            kind
-        ],
-        vmax=max(ticks),
-        vmin=min(ticks),
-    )
-    ax.invert_yaxis()
-    ax.set_yticks([0.5 + i for i in range(len(differences))])
-    ax.set_xticks([0.5 + i for i in range(0, differences.shape[1] - 6, 5)])
-    ax.set_xticklabels(list(range(0, differences.shape[1] - 6, 5)))
-    ax.set_yticklabels([f"{n} ({c})" for n, c in names_and_counts])
-    if not kind:
-        ax.set_title("Impact of restoring state after corrupted input")
-        ax.set_xlabel(f"single restored layer within {modelname}")
-    else:
-        kindname = "MLP" if kind == "mlp" else "Attn"
-        ax.set_title(
-            "Avg. impact of restoring {} after corrupted input".format(kindname)
+    def _plot_averages(pdf_filename, use_low_score_for_min=True):
+        window = 10
+        fig, ax = plt.subplots(figsize=(3.5, 2), dpi=200)
+        ticks = np.array(
+            [
+                differences.min(),
+                low_score,
+                high_score,
+                differences.max(),
+            ]
         )
-        ax.set_xlabel(f"Center of interval of {window} restored {kindname} layers")
-    cb = plt.colorbar(h)
-    cb.set_ticks(ticks[np.argsort(ticks)])
-    cb.set_ticklabels(tick_labels[np.argsort(ticks)])
-    if savepdf:
-        os.makedirs(os.path.dirname(savepdf), exist_ok=True)
-        plt.savefig(savepdf, bbox_inches="tight")
+        tick_labels = np.array(
+            [
+                "{:0.3} {}".format(ticks[i], label)
+                for i, label in enumerate(["(Min)", "(Noise)", "(Normal)", "(Max)"])
+            ]
+        )
+        args = {"vmax": max(ticks), "vmin": min(ticks)}
+        if use_low_score_for_min:
+            args = {"vmin": low_score}
+        h = ax.pcolor(
+            differences,
+            cmap={None: "Purples", "None": "Purples", "mlp": "Greens", "attn": "Reds"}[
+                kind
+            ],
+            **args,
+        )
+        ax.invert_yaxis()
+        ax.set_yticks([0.5 + i for i in range(len(differences))])
+        ax.set_xticks([0.5 + i for i in range(0, differences.shape[1] - 6, 5)])
+        ax.set_xticklabels(list(range(0, differences.shape[1] - 6, 5)))
+        ax.set_yticklabels([f"{n} ({c})" for n, c in names_and_counts])
+        if not kind:
+            ax.set_title("Impact of restoring state after corrupted input")
+            ax.set_xlabel(f"single restored layer within {modelname}")
+        else:
+            kindname = "MLP" if kind == "mlp" else "Attn"
+            ax.set_title(
+                "Avg. impact of restoring {} after corrupted input".format(kindname)
+            )
+            ax.set_xlabel(f"Center of interval of {window} restored {kindname} layers")
+        cb = plt.colorbar(h)
+        if not use_low_score_for_min:
+            cb.set_ticks(ticks[np.argsort(ticks)])
+            cb.set_ticklabels(tick_labels[np.argsort(ticks)])
+        os.makedirs(os.path.dirname(pdf_filename), exist_ok=True)
+        plt.savefig(pdf_filename, bbox_inches="tight")
         plt.close()
-    else:
-        plt.show()
+
+    _plot_averages(
+        os.path.join(os.path.dirname(savepdf), "ticks_" + os.path.basename(savepdf)),
+        use_low_score_for_min=False,
+    )
+    _plot_averages(savepdf)
 
 
 def get_memorized_ds(dataset_name, eval_df_filename):
@@ -312,7 +319,9 @@ def get_memorized_ds(dataset_name, eval_df_filename):
         if start_index != 0:
             try:
                 example["query_inference"] = (
-                    example["query"] + row["prediction"][:start_index]
+                    example["query"].strip()
+                    + " "
+                    + row["prediction"][:start_index].strip()
                 )
             except Exception as e:
                 print("example in ds", example["query"])
@@ -449,11 +458,21 @@ def plot_average_trace_heatmap(cache_output_dir, pdf_output_dir, kind, model_nam
         )
 
 
-def plot_hidden_flow(mt, ds, cache_output_dir, pdf_output_dir, kind, noise_level):
+def plot_hidden_flow(
+    mt,
+    ds,
+    cache_output_dir,
+    pdf_output_dir,
+    kind,
+    noise_level,
+    recompute_query_inference=False,
+):
     for ex in tqdm(ds, desc="Examples"):
         ex_id = ex["id"]
         filename = os.path.join(cache_output_dir, f"{ex_id}{kind}.npz")
-        if not os.path.isfile(filename):
+        if not os.path.isfile(filename) or (
+            recompute_query_inference and ex["query_inference"] != ex["query"]
+        ):
             result = calculate_hidden_flow(
                 mt,
                 ex["query_inference"],
@@ -479,6 +498,26 @@ def plot_hidden_flow(mt, ds, cache_output_dir, pdf_output_dir, kind, noise_level
     plot_average_trace_heatmap(cache_output_dir, pdf_output_dir, kind, mt.model_name)
 
 
+def filter_paraphrases(ds):
+    rng = np.random.default_rng(1)
+    df = pd.DataFrame(ds)
+    relation_subj_to_ids = {
+        f"{r}{s}": ids
+        for r, s, ids in df[["relation", "sub_uri", "id"]]
+        .groupby(by=["relation", "sub_uri"], as_index=False)
+        .agg(list)
+        .values
+    }
+    relation_subj_to_chosen_id = {
+        r_s: ids[0] if len(ids) == 1 else ids[rng.choice(len(ids), 1)]
+        for r_s, ids in relation_subj_to_ids.items()
+    }
+    return ds.filter(
+        lambda ex: ex["id"]
+        == relation_subj_to_chosen_id[f"{ex['relation']}{ex['sub_uri']}"]
+    )
+
+
 def get_dataset(args):
     if args.dataset_name == "known_facts_rome":
         knowns = KnownsDataset(DATA_DIR)
@@ -498,7 +537,8 @@ def get_dataset(args):
         "eval_per_example_records.json",
     )
     wandb.config["eval_df_filename"] = eval_df_filename
-    return get_memorized_ds(args.dataset_name, eval_df_filename)
+    ds = get_memorized_ds(args.dataset_name, eval_df_filename)
+    return filter_paraphrases(ds)
 
 
 def main(args):
@@ -562,7 +602,15 @@ def main(args):
                 cache_hidden_flow, pdf_output_dir, kind, mt.model_name
             )
             continue
-        plot_hidden_flow(mt, ds, cache_hidden_flow, pdf_output_dir, kind, noise_level)
+        plot_hidden_flow(
+            mt,
+            ds,
+            cache_hidden_flow,
+            pdf_output_dir,
+            kind,
+            noise_level,
+            recompute_query_inference=args.recompute_query_inference,
+        )
 
 
 if __name__ == "__main__":
@@ -604,6 +652,7 @@ if __name__ == "__main__":
     parser.add_argument("--only_subset", action="store_true")
     parser.add_argument("--override_noise_level", type=float, help="")
     parser.add_argument("--only_plot_average", action="store_true")
+    parser.add_argument("--recompute_query_inference", action="store_true")
     args = parser.parse_args()
     if not args.model_name:
         args.model_name = args.model_name_or_path.replace("/", "__")
