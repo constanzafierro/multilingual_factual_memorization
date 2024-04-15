@@ -509,7 +509,7 @@ def filter_paraphrases(ds):
         .values
     }
     relation_subj_to_chosen_id = {
-        r_s: ids[0] if len(ids) == 1 else ids[rng.choice(len(ids), 1)]
+        r_s: ids[0] if len(ids) == 1 else ids[rng.choice(len(ids), 1)[0]]
         for r_s, ids in relation_subj_to_ids.items()
     }
     return ds.filter(
