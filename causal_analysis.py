@@ -389,10 +389,10 @@ def get_memorized_ds(dataset_name, eval_df_filename):
     return ds
 
 
-def plot_average_trace_heatmap(cache_output_dir, pdf_output_dir, kind, model_name):
+def plot_average_trace_heatmap(ds, cache_output_dir, pdf_output_dir, kind, model_name):
     total_scores = collections.defaultdict(list)
-    files = glob(os.path.join(cache_output_dir, f"*{kind}.npz"))
-    for results_file in files:
+    for ex in tqdm(ds, desc="Average Examples"):
+        results_file = os.path.join(cache_output_dir, f"{ex['id']}{kind}.npz")
         numpy_result = np.load(
             os.path.join(cache_output_dir, results_file), allow_pickle=True
         )
@@ -495,7 +495,9 @@ def plot_hidden_flow(
         plot_trace_heatmap(numpy_result, savepdf=pdfname, modelname=mt.model_name)
 
     # Save plot of average.
-    plot_average_trace_heatmap(cache_output_dir, pdf_output_dir, kind, mt.model_name)
+    plot_average_trace_heatmap(
+        ds, cache_output_dir, pdf_output_dir, kind, mt.model_name
+    )
 
 
 def filter_paraphrases(ds):
@@ -599,7 +601,7 @@ def main(args):
         print("Computing for", kind)
         if args.only_plot_average:
             plot_average_trace_heatmap(
-                cache_hidden_flow, pdf_output_dir, kind, mt.model_name
+                ds, cache_hidden_flow, pdf_output_dir, kind, mt.model_name
             )
             continue
         plot_hidden_flow(
