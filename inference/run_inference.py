@@ -18,6 +18,7 @@ from transformers import (
     PreTrainedTokenizerFast,
     T5TokenizerFast,
     XGLMTokenizerFast,
+    GPT2TokenizerFast,
 )
 
 from dataset.pararel_utils import SUBJECT_QCODE
@@ -45,6 +46,7 @@ def remove_bos(tokenizer, seq, input_ids):
         LlamaTokenizerFast: ignore_prompt,
         XGLMTokenizerFast: ignore_prompt,
         BloomTokenizerFast: ignore_prompt,
+        GPT2TokenizerFast: ignore_prompt,
         PreTrainedTokenizerFast: lambda seq, input_ids: seq[input_ids.shape[1] :]
         .cpu()
         .tolist(),
@@ -72,6 +74,7 @@ def get_ids_to_ignore(tokenizer):
         PreTrainedTokenizerFast: [tokenizer.eos_token_id],
         XGLMTokenizerFast: [tokenizer.eos_token_id],
         BloomTokenizerFast: [],
+        GPT2TokenizerFast: [],
     }
     return ids_to_ignore[type(tokenizer)]
 
