@@ -521,8 +521,8 @@ def filter_paraphrases(ds):
     )
 
 
-def get_dataset(args):
-    if args.dataset_name == "known_facts_rome":
+def get_dataset(dataset_name, language, eval_dir, model_name, only_subset):
+    if dataset_name == "known_facts_rome":
         knowns = KnownsDataset(DATA_DIR)
         ds = []
         for k in knowns:
@@ -535,13 +535,18 @@ def get_dataset(args):
             )
         return ds
     eval_df_filename = os.path.join(
-        args.eval_dir,
-        f"{args.language}--{args.dataset_name.split('/')[1]}--{args.model_name}",
+        eval_dir,
+        f"{language}--{dataset_name.split('/')[1]}--{model_name}",
         "eval_per_example_records.json",
     )
     wandb.config["eval_df_filename"] = eval_df_filename
-    ds = get_memorized_ds(args.dataset_name, eval_df_filename)
-    return filter_paraphrases(ds)
+    ds = get_memorized_ds(dataset_name, eval_df_filename)
+    ds = filter_paraphrases(ds)
+    if only_subset and len(ds) > 1000:
+        total = max(1000, int(len(ds) * 0.1))
+        rng = np.random.default_rng(0)
+        ds = ds.select(rng.choice(len(ds), total, replace=False))
+    return ds
 
 
 def main(args):
@@ -581,11 +586,13 @@ def main(args):
         )
     )
 
-    ds = get_dataset(args)
-    if args.only_subset and len(ds) > 1000:
-        total = max(1000, int(len(ds) * 0.1))
-        rng = np.random.default_rng(0)
-        ds = ds.select(rng.choice(len(ds), total, replace=False))
+    ds = get_dataset(
+        args.dataset_name,
+        args.language,
+        args.eval_dir,
+        args.model_name,
+        args.only_subset,
+    )
     print("Computing causal analysis for", len(ds))
 
     print("Computing noise level...")
