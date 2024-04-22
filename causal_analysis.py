@@ -248,17 +248,16 @@ def plot_averages(
             [
                 differences.min(),
                 low_score,
-                high_score,
                 differences.max(),
             ]
         )
         tick_labels = np.array(
             [
                 "{:0.3} {}".format(ticks[i], label)
-                for i, label in enumerate(["(Min)", "(Noise)", "(Normal)", "(Max)"])
+                for i, label in enumerate(["(Min)", "(Noise)", "(Max)"])
             ]
         )
-        args = {"vmax": max(ticks), "vmin": min(ticks)}
+        args = {"vmin": min(ticks)}
         if use_low_score_for_min:
             args = {"vmin": low_score}
         h = ax.pcolor(
@@ -283,6 +282,7 @@ def plot_averages(
             )
             ax.set_xlabel(f"Center of interval of {window} restored {kindname} layers")
         cb = plt.colorbar(h)
+        cb.ax.set_title("p(%)={:0.3}".format(high_score), y=-0.16, fontsize=10)
         if not use_low_score_for_min:
             cb.set_ticks(ticks[np.argsort(ticks)])
             cb.set_ticklabels(tick_labels[np.argsort(ticks)])
