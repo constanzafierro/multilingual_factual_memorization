@@ -597,6 +597,7 @@ def main(args):
             [ex["sub_label"] for ex in ds],
             subjects_from_ds=data_id,
         )
+    wandb.run.summary["noise_level"] = noise_level
     print(f"Using noise level {noise_level}")
     for kind in [None, "mlp", "attn"]:
         print("Computing for", kind)
