@@ -9,9 +9,26 @@ from datasets import load_dataset
 
 from third_party.rome.dsets import KnownsDataset
 from third_party.rome.util.globals import DATA_DIR
+from transformers import (
+    LlamaTokenizerFast,
+    GPT2TokenizerFast,
+    T5TokenizerFast,
+    LlamaTokenizer,
+    GPTNeoXTokenizerFast,
+)
+
+TOKENIZER_TO_PREPEND_SPACE = {
+    LlamaTokenizerFast: False,
+    GPT2TokenizerFast: True,
+    T5TokenizerFast: True,
+    LlamaTokenizer: False,
+    GPTNeoXTokenizerFast: True,
+}
 
 
-def find_token_range(tokenizer, token_ids_array, subject):
+def find_token_range(tokenizer, token_ids_array, subject, prompt):
+    if TOKENIZER_TO_PREPEND_SPACE[type(tokenizer)] and not prompt.startswith(subject):
+        subject = " " + subject
     subj_tokens = tokenizer.tokenize(subject)
     subj_token_ids = tokenizer.convert_tokens_to_ids(subj_tokens)
     token_ids_array = np.array(token_ids_array.cpu())
@@ -45,6 +62,12 @@ def find_token_range(tokenizer, token_ids_array, subject):
         tokenizer.decode(token_ids_array[overlap_index + max_overlap : last_subj_token])
     ):
         last_subj_token += 1
+    if overlap_index == -1:
+        raise Exception(
+            "Failed to find subject={} in the token_ids_array={}".format(
+                subject, token_ids_array
+            )
+        )
     return overlap_index, last_subj_token
 
 

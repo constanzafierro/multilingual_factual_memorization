@@ -1,5 +1,4 @@
 from accelerate import Accelerator
-from tqdm import tqdm
 from transformers import (
     AutoModelForCausalLM,
     AutoTokenizer,
