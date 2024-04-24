@@ -261,7 +261,7 @@ def plot_average_trace_heatmap(ds, cache_output_dir, pdf_output_dir, kind, model
         total_scores["last_token"].append(numpy_result["scores"][-1])
         total_scores["low_score"].append(numpy_result["low_score"])
         total_scores["high_score"].append(numpy_result["high_score"])
-    plot_averages(
+    differences = (
         np.array(
             [
                 np.mean(total_scores["before_subj"], axis=0),
@@ -274,6 +274,9 @@ def plot_average_trace_heatmap(ds, cache_output_dir, pdf_output_dir, kind, model
                 np.mean(total_scores["last_token"], axis=0),
             ]
         ),
+    )
+    plot_averages(
+        differences,
         [
             (k, len(total_scores[k]))
             for k in [
@@ -301,6 +304,11 @@ def plot_average_trace_heatmap(ds, cache_output_dir, pdf_output_dir, kind, model
     if wandb.run is not None:
         wandb.summary[f"{kind}_avg_best_layer"] = np.argmax(
             np.mean(total_scores["last_subj_token"], axis=0)
+        )
+        p_noise = np.mean(total_scores["low_score"])
+        p_min = differences.min()
+        wandb.summary[f"significant_{kind}"] = (
+            p_noise + (p_noise - p_min) < differences.max()
         )
 
 
