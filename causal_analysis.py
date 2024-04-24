@@ -261,19 +261,17 @@ def plot_average_trace_heatmap(ds, cache_output_dir, pdf_output_dir, kind, model
         total_scores["last_token"].append(numpy_result["scores"][-1])
         total_scores["low_score"].append(numpy_result["low_score"])
         total_scores["high_score"].append(numpy_result["high_score"])
-    differences = (
-        np.array(
-            [
-                np.mean(total_scores["before_subj"], axis=0),
-                np.mean(total_scores["first_subj_token"], axis=0),
-                np.mean(total_scores["mid_subj_tokens"], axis=0),
-                np.mean(total_scores["last_subj_token"], axis=0),
-                np.mean(total_scores["all_subj_tokens"], axis=0),
-                np.mean(total_scores["after_subj"], axis=0),
-                np.mean(total_scores["after_subj_last"], axis=0),
-                np.mean(total_scores["last_token"], axis=0),
-            ]
-        ),
+    differences = np.array(
+        [
+            np.mean(total_scores["before_subj"], axis=0),
+            np.mean(total_scores["first_subj_token"], axis=0),
+            np.mean(total_scores["mid_subj_tokens"], axis=0),
+            np.mean(total_scores["last_subj_token"], axis=0),
+            np.mean(total_scores["all_subj_tokens"], axis=0),
+            np.mean(total_scores["after_subj"], axis=0),
+            np.mean(total_scores["after_subj_last"], axis=0),
+            np.mean(total_scores["last_token"], axis=0),
+        ]
     )
     plot_averages(
         differences,
