@@ -352,7 +352,7 @@ def plot_hidden_flow(
 
     # Save plot of average.
     plot_average_trace_heatmap(
-        ds, cache_output_dir, pdf_output_dir, kind, mt.model_name
+        ds, cache_output_dir, pdf_output_dir, kind, mt.model_name, mt.tokenizer
     )
 
 
@@ -417,7 +417,7 @@ def main(args):
         print("Computing for", kind)
         if args.only_plot_average:
             plot_average_trace_heatmap(
-                ds, cache_hidden_flow, pdf_output_dir, kind, mt.model_name
+                ds, cache_hidden_flow, pdf_output_dir, kind, mt.model_name, mt.tokenizer
             )
             continue
         plot_hidden_flow(
