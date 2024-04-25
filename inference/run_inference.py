@@ -209,7 +209,7 @@ def main(args):
     wandb.config["final_dir"] = experiment_dir
 
     print("Loading model")
-    use_fast = True
+    model_args = {}
     if (
         "alpaca" in args.model_name_or_path
         or "llama" in args.model_name_or_path.lower()
@@ -218,6 +218,7 @@ def main(args):
         tokenizer_args = {"use_fast": False}
     elif "polylm" in args.model_name_or_path:
         tokenizer_args = {"legacy": False, "use_fast": False}
+        model_args = {"trust_remote_code": True}
     tokenizer = AutoTokenizer.from_pretrained(args.model_name_or_path, **tokenizer_args)
 
     if "t5" not in args.model_name_or_path:
@@ -231,7 +232,7 @@ def main(args):
             )
     else:
         model = AutoModelForSeq2SeqLM.from_pretrained(
-            args.model_name_or_path, load_in_8bit=True, device_map="auto"
+            args.model_name_or_path, load_in_8bit=True, device_map="auto", **model_args
         )
     model.eval()
 
