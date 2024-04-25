@@ -209,7 +209,7 @@ def main(args):
     wandb.config["final_dir"] = experiment_dir
 
     print("Loading model")
-    model_args = {"load_in_8bit": True, "device_map": "auto"}
+    model_args = {}
     if (
         "alpaca" in args.model_name_or_path
         or "llama" in args.model_name_or_path.lower()
@@ -232,7 +232,7 @@ def main(args):
             )
     else:
         model = AutoModelForSeq2SeqLM.from_pretrained(
-            args.model_name_or_path, **model_args
+            args.model_name_or_path, load_in_8bit=True, device_map="auto", **model_args
         )
     model.eval()
 
