@@ -209,6 +209,7 @@ def main(args):
     wandb.config["final_dir"] = experiment_dir
 
     print("Loading model")
+    tokenizer_args = {}
     if (
         "alpaca" in args.model_name_or_path
         or "llama" in args.model_name_or_path.lower()
@@ -221,7 +222,9 @@ def main(args):
 
     if "t5" in args.model_name_or_path:
         model = AutoModelForSeq2SeqLM.from_pretrained(
-            args.model_name_or_path, load_in_8bit=True, device_map="auto"
+            args.model_name_or_path,
+            load_in_8bit="xxl" in args.model_name_or_path,
+            device_map="auto",
         )
     elif "polylm" in args.model_name_or_path:
         model = AutoModelForCausalLM.from_pretrained(
