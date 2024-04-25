@@ -227,12 +227,12 @@ def main(args):
                 args.model_name_or_path, cache_dir=args.cache_dir
             ).to(device)
         else:
-            model = AutoModelForCausalLM.from_pretrained(args.model_name_or_path).to(
-                device
-            )
+            model = AutoModelForCausalLM.from_pretrained(
+                args.model_name_or_path, **model_args
+            ).to(device)
     else:
         model = AutoModelForSeq2SeqLM.from_pretrained(
-            args.model_name_or_path, load_in_8bit=True, device_map="auto", **model_args
+            args.model_name_or_path, load_in_8bit=True, device_map="auto"
         )
     model.eval()
 
