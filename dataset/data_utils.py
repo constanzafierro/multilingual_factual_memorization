@@ -131,7 +131,7 @@ def get_memorized_ds(dataset_name, eval_df_filename):
         lambda row: ds[ds_id_to_index[row["id"]]]["query"], axis=1
     )
     memorized_df["is_trivial"] = memorized_df.apply(
-        lambda row: is_trivial_example(row["ground_truth"], row), axis=1
+        lambda row: is_trivial_example(row["ground_truth"], row["query"]), axis=1
     )
     wandb.log(
         {
