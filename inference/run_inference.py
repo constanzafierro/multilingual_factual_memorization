@@ -209,7 +209,6 @@ def main(args):
     wandb.config["final_dir"] = experiment_dir
 
     print("Loading model")
-    model_args = {}
     if (
         "alpaca" in args.model_name_or_path
         or "llama" in args.model_name_or_path.lower()
@@ -218,26 +217,21 @@ def main(args):
         tokenizer_args = {"use_fast": False}
     elif "polylm" in args.model_name_or_path:
         tokenizer_args = {"legacy": False, "use_fast": False}
-        model_args = {
-            "trust_remote_code": True,
-            "device_map": "auto",
-            "load_in_8bit": True,
-        }
     tokenizer = AutoTokenizer.from_pretrained(args.model_name_or_path, **tokenizer_args)
 
-    if "t5" not in args.model_name_or_path:
-        if args.cache_dir is not None:
-            model = AutoModelForCausalLM.from_pretrained(
-                args.model_name_or_path, cache_dir=args.cache_dir
-            ).to(device)
-        else:
-            model = AutoModelForCausalLM.from_pretrained(
-                args.model_name_or_path, **model_args
-            ).to(device)
-    else:
+    if "t5" in args.model_name_or_path:
         model = AutoModelForSeq2SeqLM.from_pretrained(
             args.model_name_or_path, load_in_8bit=True, device_map="auto"
         )
+    elif "polylm" in args.model_name_or_path:
+        model = AutoModelForCausalLM.from_pretrained(
+            args.model_name_or_path,
+            trust_remote_code=True,
+            device_map="auto",
+            load_in_8bit="13b" in args.model_name_or_path,
+        )
+    else:
+        model = AutoModelForCausalLM.from_pretrained(args.model_name_or_path).to(device)
     model.eval()
 
     print("Loading dataset")
