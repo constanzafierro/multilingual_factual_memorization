@@ -177,16 +177,16 @@ def trace_important_window(
 
 
 def plot_averages(
-    differences, names_and_counts, low_score, high_score, modelname, kind, savepdf
+    scores, names_and_counts, low_score, high_score, modelname, kind, savepdf
 ):
     def _plot_averages(pdf_filename, use_low_score_for_min=True):
         window = 10
         fig, ax = plt.subplots(figsize=(3.5, 2), dpi=200)
         ticks = np.array(
             [
-                differences.min(),
+                scores.min(),
                 low_score,
-                differences.max(),
+                scores.max(),
             ]
         )
         tick_labels = np.array(
@@ -199,16 +199,16 @@ def plot_averages(
         if use_low_score_for_min:
             args = {"vmin": low_score}
         h = ax.pcolor(
-            differences,
+            scores,
             cmap={None: "Purples", "None": "Purples", "mlp": "Greens", "attn": "Reds"}[
                 kind
             ],
             **args,
         )
         ax.invert_yaxis()
-        ax.set_yticks([0.5 + i for i in range(len(differences))])
-        ax.set_xticks([0.5 + i for i in range(0, differences.shape[1] - 6, 5)])
-        ax.set_xticklabels(list(range(0, differences.shape[1] - 6, 5)))
+        ax.set_yticks([0.5 + i for i in range(len(scores))])
+        ax.set_xticks([0.5 + i for i in range(0, scores.shape[1] - 6, 5)])
+        ax.set_xticklabels(list(range(0, scores.shape[1] - 6, 5)))
         ax.set_yticklabels([f"{n} ({c})" for n, c in names_and_counts])
         if not kind:
             ax.set_title("Impact of restoring state after corrupted input")
@@ -227,6 +227,17 @@ def plot_averages(
         os.makedirs(os.path.dirname(pdf_filename), exist_ok=True)
         plt.savefig(pdf_filename, bbox_inches="tight")
         plt.close()
+
+    data_filename = os.path.join(os.path.dirname(savepdf), "avg_data.npz")
+    numpy_result = {
+        "scores": scores,
+        "names_and_counts": names_and_counts,
+        "low_score": low_score,
+        "high_score": high_score,
+        "modelname": modelname,
+        "kind": kind,
+    }
+    np.savez(data_filename, **numpy_result)
 
     _plot_averages(
         os.path.join(os.path.dirname(savepdf), "ticks_" + os.path.basename(savepdf)),
