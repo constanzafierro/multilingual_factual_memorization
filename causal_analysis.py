@@ -235,7 +235,9 @@ def plot_averages(
     _plot_averages(savepdf)
 
 
-def plot_average_trace_heatmap(ds, cache_output_dir, pdf_output_dir, kind, model_name):
+def plot_average_trace_heatmap(
+    ds, cache_output_dir, pdf_output_dir, kind, model_name, tokenizer
+):
     total_scores = collections.defaultdict(list)
     for ex in tqdm(ds, desc="Average Examples"):
         results_file = os.path.join(cache_output_dir, f"{ex['id']}{kind}.npz")
@@ -249,7 +251,10 @@ def plot_average_trace_heatmap(ds, cache_output_dir, pdf_output_dir, kind, model
             numpy_result["scores"][first_subj_token]
         )
         for i in range(0, numpy_result["subject_range"][0]):
-            total_scores["before_subj"].append(numpy_result["scores"][i])
+            if i == 0 and tokenizer.bos_token is not None:
+                total_scores["bos"].append(numpy_result["scores"][i])
+            else:
+                total_scores["before_subj"].append(numpy_result["scores"][i])
         for i in range(first_subj_token + 1, last_subj_token):
             total_scores["mid_subj_tokens"].append(numpy_result["scores"][i])
         for i in range(first_subj_token, last_subj_token + 1):
@@ -257,36 +262,35 @@ def plot_average_trace_heatmap(ds, cache_output_dir, pdf_output_dir, kind, model
         if last_subj_token < len(numpy_result["scores"]) - 1:
             for i in range(last_subj_token, len(numpy_result["scores"])):
                 total_scores["after_subj"].append(numpy_result["scores"][i])
+            total_scores["after_subj_first"].append(numpy_result["scores"][0])
             total_scores["after_subj_last"].append(numpy_result["scores"][-1])
         total_scores["last_token"].append(numpy_result["scores"][-1])
         total_scores["low_score"].append(numpy_result["low_score"])
         total_scores["high_score"].append(numpy_result["high_score"])
+    agg_tokens_keys = [
+        "bos",
+        "before_subj",
+        "first_subj_token",
+        "mid_subj_tokens",
+        "last_subj_token",
+        "all_subj_tokens",
+        "after_subj",
+        "after_subj_last",
+        "last_token",
+    ]
     differences = np.array(
         [
-            np.mean(total_scores["before_subj"], axis=0),
-            np.mean(total_scores["first_subj_token"], axis=0),
-            np.mean(total_scores["mid_subj_tokens"], axis=0),
-            np.mean(total_scores["last_subj_token"], axis=0),
-            np.mean(total_scores["all_subj_tokens"], axis=0),
-            np.mean(total_scores["after_subj"], axis=0),
-            np.mean(total_scores["after_subj_last"], axis=0),
-            np.mean(total_scores["last_token"], axis=0),
+            np.mean(total_scores[k], axis=0)
+            for k in agg_tokens_keys
+            if len(total_scores[k]) > 0
         ]
     )
     plot_averages(
         differences,
         [
             (k, len(total_scores[k]))
-            for k in [
-                "before_subj",
-                "first_subj_token",
-                "mid_subj_tokens",
-                "last_subj_token",
-                "all_subj_tokens",
-                "after_subj",
-                "after_subj_last",
-                "last_token",
-            ]
+            for k in agg_tokens_keys
+            if len(total_scores[k]) > 0
         ],
         np.mean(total_scores["low_score"]),
         np.mean(total_scores["high_score"]),
