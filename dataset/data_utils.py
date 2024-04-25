@@ -71,6 +71,16 @@ def find_token_range(tokenizer, token_ids_array, subject, prompt):
     return overlap_index, last_subj_token
 
 
+def is_trivial_example(objs, query):
+    if not isinstance(objs, list):
+        objs = [objs]
+    query = query.lower()
+    for possible_ans in objs:
+        if possible_ans.lower() in query:
+            return True
+    return False
+
+
 def get_memorized_ds(dataset_name, eval_df_filename):
     def remove_punc(text):
         exclude = set(string.punctuation)
@@ -108,16 +118,6 @@ def get_memorized_ds(dataset_name, eval_df_filename):
             example["query_inference"] = example["query"]
         return example
 
-    def is_trivial_example(ex):
-        objs = ex["ground_truth"]
-        if not isinstance(objs, list):
-            objs = [objs]
-        query = ex["query"].lower()
-        for possible_ans in objs:
-            if possible_ans.lower() in query:
-                return True
-        return False
-
     inference_df = pd.read_json(eval_df_filename)
     memorized_df = inference_df[inference_df.exact_match].copy()
     ds = load_dataset(dataset_name)["train"]
@@ -131,7 +131,7 @@ def get_memorized_ds(dataset_name, eval_df_filename):
         lambda row: ds[ds_id_to_index[row["id"]]]["query"], axis=1
     )
     memorized_df["is_trivial"] = memorized_df.apply(
-        lambda row: is_trivial_example(row), axis=1
+        lambda row: is_trivial_example(row["ground_truth"], row), axis=1
     )
     wandb.log(
         {
@@ -209,4 +209,7 @@ def get_memorized_dataset(dataset_name, language, eval_dir, model_name, only_sub
         total = max(1000, int(len(ds) * 0.1))
         rng = np.random.default_rng(0)
         ds = ds.select(rng.choice(len(ds), total, replace=False))
+    wandb.run.summary["trivial_in_sample"] = len(
+        ds.filter(lambda ex: is_trivial_example(ex["obj_label"], ex["query"]))
+    )
     return ds
