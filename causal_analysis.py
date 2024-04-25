@@ -249,6 +249,7 @@ def plot_averages(
 def plot_average_trace_heatmap(
     ds, cache_output_dir, pdf_output_dir, kind, model_name, tokenizer
 ):
+    has_bos = tokenizer("some long text here")["input_ids"][0] == tokenizer.bos_tokn_id
     total_scores = collections.defaultdict(list)
     for ex in tqdm(ds, desc="Average Examples"):
         results_file = os.path.join(cache_output_dir, f"{ex['id']}{kind}.npz")
@@ -262,7 +263,7 @@ def plot_average_trace_heatmap(
             numpy_result["scores"][first_subj_token]
         )
         for i in range(0, numpy_result["subject_range"][0]):
-            if i == 0 and tokenizer.bos_token is not None:
+            if i == 0 and has_bos:
                 total_scores["bos"].append(numpy_result["scores"][i])
             else:
                 total_scores["before_subj"].append(numpy_result["scores"][i])
