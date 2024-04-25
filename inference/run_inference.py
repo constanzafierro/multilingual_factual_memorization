@@ -218,7 +218,11 @@ def main(args):
         tokenizer_args = {"use_fast": False}
     elif "polylm" in args.model_name_or_path:
         tokenizer_args = {"legacy": False, "use_fast": False}
-        model_args = {"trust_remote_code": True, "device_map": "auto"}
+        model_args = {
+            "trust_remote_code": True,
+            "device_map": "auto",
+            "load_in_8bit": True,
+        }
     tokenizer = AutoTokenizer.from_pretrained(args.model_name_or_path, **tokenizer_args)
 
     if "t5" not in args.model_name_or_path:
