@@ -414,7 +414,7 @@ def main(args):
         args.only_subset,
     )
     print("Computing causal analysis for", len(ds))
-    wandb.run.summar["n_examples_causal_analysis"] = len(ds)
+    wandb.run.summary["n_examples_causal_analysis"] = len(ds)
 
     print("Computing noise level...")
     if args.override_noise_level is not None:
