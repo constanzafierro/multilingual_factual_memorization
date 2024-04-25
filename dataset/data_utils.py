@@ -245,10 +245,9 @@ def get_memorized_dataset(
             )
         else:
             ds = ds_sample
-
+    if filter_trivial:
+        ds = ds.filter(lambda ex: not is_trivial_example(ex["obj_label"], ex["query"]))
     wandb.run.summary["trivial_in_sample"] = len(
         ds.filter(lambda ex: is_trivial_example(ex["obj_label"], ex["query"]))
     )
-    if filter_trivial:
-        ds = ds.filter(lambda ex: not is_trivial_example(ex["obj_label"], ex["query"]))
     return ds

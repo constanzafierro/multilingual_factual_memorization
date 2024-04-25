@@ -390,7 +390,9 @@ def main(args):
             data_id + f"_noise={args.override_noise_level}",
         )
     cache_hidden_flow = os.path.join(cache_dir, "cache_hidden_flow")
-    pdf_output_dir = os.path.join(cache_dir, "plots")
+    pdf_output_dir = os.path.join(
+        cache_dir, "plots_filter_trivial" if args.filter_trivial else "plots"
+    )
     wandb.config["cache_output_dir"] = cache_dir
     wandb.config["plots_output_dir"] = pdf_output_dir
     os.makedirs(cache_hidden_flow, exist_ok=True)
