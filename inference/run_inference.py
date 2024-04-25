@@ -215,10 +215,11 @@ def main(args):
         or "llama" in args.model_name_or_path.lower()
     ):
         # the fact tokenizer causes issues with protobuf and tokenizers libraries
-        use_fast = False
-    tokenizer = AutoTokenizer.from_pretrained(
-        args.model_name_or_path, use_fast=use_fast
-    )
+        tokenizer_args = {"use_fast": False}
+    elif "polylm" in args.model_name_or_path:
+        tokenizer_args = {"legacy": False, "use_fast": False}
+    tokenizer = AutoTokenizer.from_pretrained(args.model_name_or_path, **tokenizer_args)
+
     if "t5" not in args.model_name_or_path:
         if args.cache_dir is not None:
             model = AutoModelForCausalLM.from_pretrained(
