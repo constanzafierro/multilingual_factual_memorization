@@ -5,7 +5,7 @@ from functools import partial
 import numpy as np
 import pandas as pd
 import wandb
-from datasets import load_dataset
+from datasets import load_dataset, concatenate_datasets
 
 from third_party.rome.dsets import KnownsDataset
 from third_party.rome.util.globals import DATA_DIR
@@ -184,7 +184,15 @@ def filter_paraphrases(ds):
     )
 
 
-def get_memorized_dataset(dataset_name, language, eval_dir, model_name, only_subset):
+def get_memorized_dataset(
+    dataset_name,
+    language,
+    eval_dir,
+    model_name,
+    only_subset,
+    filter_trivial=False,
+    resample_trivial=False,
+):
     if dataset_name == "known_facts_rome":
         knowns = KnownsDataset(DATA_DIR)
         ds = []
@@ -208,8 +216,39 @@ def get_memorized_dataset(dataset_name, language, eval_dir, model_name, only_sub
     if only_subset and len(ds) > 1000:
         total = max(1000, int(len(ds) * 0.1))
         rng = np.random.default_rng(0)
-        ds = ds.select(rng.choice(len(ds), total, replace=False))
+        sample_indices = rng.choice(len(ds), total, replace=False)
+        ds_sample = ds.select(sample_indices)
+        if not resample_trivial:
+            ds_sample_trivial = ds_sample.filter(
+                lambda ex: is_trivial_example(ex["obj_label"], ex["query"])
+            )
+            sample_indices = set(sample_indices)
+            non_trivial_non_selected_ds = ds.filter(
+                lambda ex, i: i not in sample_indices
+                and not is_trivial_example(ex["obj_label"], ex["query"]),
+                with_indices=True,
+            )
+            extra_sample = non_trivial_non_selected_ds.select(
+                rng.choice(
+                    len(non_trivial_non_selected_ds),
+                    len(ds_sample_trivial),
+                    replace=False,
+                )
+            )
+            ds = concatenate_datasets(
+                [
+                    ds_sample,
+                    extra_sample.filter(
+                        lambda ex: not is_trivial_example(ex["obj_label"], ex["query"])
+                    ),
+                ]
+            )
+        else:
+            ds = ds_sample
+
     wandb.run.summary["trivial_in_sample"] = len(
         ds.filter(lambda ex: is_trivial_example(ex["obj_label"], ex["query"]))
     )
+    if filter_trivial:
+        ds = ds.filter(lambda ex: not is_trivial_example(ex["obj_label"], ex["query"]))
     return ds
