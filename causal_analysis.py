@@ -285,6 +285,7 @@ def plot_average_trace_heatmap(
         "mid_subj_tokens",
         "last_subj_token",
         "all_subj_tokens",
+        "after_subj_first",
         "after_subj",
         "after_subj_last",
         "last_token",
