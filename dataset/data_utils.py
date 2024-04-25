@@ -218,7 +218,7 @@ def get_memorized_dataset(
         rng = np.random.default_rng(0)
         sample_indices = rng.choice(len(ds), total, replace=False)
         ds_sample = ds.select(sample_indices)
-        if not resample_trivial:
+        if resample_trivial:
             ds_sample_trivial = ds_sample.filter(
                 lambda ex: is_trivial_example(ex["obj_label"], ex["query"])
             )
