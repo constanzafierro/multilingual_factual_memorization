@@ -249,7 +249,7 @@ def plot_averages(
 def plot_average_trace_heatmap(
     ds, cache_output_dir, pdf_output_dir, kind, model_name, tokenizer
 ):
-    has_bos = tokenizer("some long text here")["input_ids"][0] == tokenizer.bos_tokn_id
+    has_bos = tokenizer("some long text here")["input_ids"][0] == tokenizer.bos_token_id
     total_scores = collections.defaultdict(list)
     for ex in tqdm(ds, desc="Average Examples"):
         results_file = os.path.join(cache_output_dir, f"{ex['id']}{kind}.npz")
