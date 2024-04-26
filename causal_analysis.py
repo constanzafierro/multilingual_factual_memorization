@@ -317,7 +317,7 @@ def plot_average_trace_heatmap(
     if use_vmin_vmax_from_file is not None:
         numpy_result = np.load(use_vmin_vmax_from_file, allow_pickle=True)
         vmin = numpy_result["low_score"]
-        vmax = numpy_result["differences"].max()
+        vmax = numpy_result["scores"].max()
         vmin_max = [vmin, vmax]
     plot_averages(
         differences,
