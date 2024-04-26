@@ -3,10 +3,7 @@ import itertools
 import json
 from transformers import (
     LlamaTokenizerFast,
-    GPT2TokenizerFast,
-    T5TokenizerFast,
     LlamaTokenizer,
-    GPTNeoXTokenizerFast,
 )
 import re
 import os
@@ -23,14 +20,6 @@ PATTERN_KEY = "pattern"
 MPARAREL_FOLDER = "mpararel/data/mpararel_reviewed"
 PATTERNS_FOLDER = "patterns"
 TUPLES_FOLDER = "tuples"
-
-TOKENIZER_TO_PREPEND_SPACE = {
-    LlamaTokenizerFast: False,
-    GPT2TokenizerFast: True,
-    T5TokenizerFast: True,
-    LlamaTokenizer: False,
-    GPTNeoXTokenizerFast: True,
-}
 
 
 def _get_mpararel_items(path_to_file, key_item=None):
@@ -130,27 +119,6 @@ def get_mpararel_subject_object_aliases(
         aliases = obj_id_to_aliases[data[OBJECT_QCODE]]
         data[OBJECT_KEY] = [data[OBJECT_KEY], *aliases]
     return unique_subjects_data
-
-
-def get_target_object(tokenizer, object_):
-    # This works for SentencePiece tokenizers (e.g. T5) which
-    # tokenize space and no space to the same id. It's also what
-    # GPT-2 BPE tokenizer expects for words not at the beginning of
-    # the sentence.
-    if TOKENIZER_TO_PREPEND_SPACE[type(tokenizer)]:
-        target_object = " " + object_.strip()
-    else:
-        if not isinstance(tokenizer, LlamaTokenizerFast) and not isinstance(
-            tokenizer, LlamaTokenizer
-        ):
-            raise Exception(
-                "Check that no space in the template and target "
-                "with no space is the right setup for tokenizer {}".format(
-                    type(tokenizer)
-                )
-            )
-        target_object = object_.strip()
-    return target_object
 
 
 class PararelPrompt:
