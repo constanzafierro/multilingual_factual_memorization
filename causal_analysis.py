@@ -177,7 +177,14 @@ def trace_important_window(
 
 
 def plot_averages(
-    scores, names_and_counts, low_score, high_score, modelname, kind, savepdf
+    scores,
+    names_and_counts,
+    low_score,
+    high_score,
+    modelname,
+    kind,
+    savepdf,
+    vmin_vmax=None,
 ):
     def _plot_averages(pdf_filename, use_low_score_for_min=True):
         window = 10
@@ -198,6 +205,8 @@ def plot_averages(
         args = {"vmin": min(ticks)}
         if use_low_score_for_min:
             args = {"vmin": low_score}
+        if vmin_vmax is not None:
+            args = {"vmin": vmin_vmax[0], "vmax": vmin_vmax[1]}
         h = ax.pcolor(
             scores,
             cmap={None: "Purples", "None": "Purples", "mlp": "Greens", "attn": "Reds"}[
@@ -247,7 +256,13 @@ def plot_averages(
 
 
 def plot_average_trace_heatmap(
-    ds, cache_output_dir, pdf_output_dir, kind, model_name, tokenizer
+    ds,
+    cache_output_dir,
+    pdf_output_dir,
+    kind,
+    model_name,
+    tokenizer,
+    use_vmin_vmax_from_folder=None,
 ):
     has_bos = tokenizer("some long text here")["input_ids"][0] == tokenizer.bos_token_id
     total_scores = collections.defaultdict(list)
@@ -298,6 +313,12 @@ def plot_average_trace_heatmap(
             if len(total_scores[k]) > 0
         ]
     )
+    vmin_max = None
+    if use_vmin_vmax_from_folder is not None:
+        numpy_result = np.load(use_vmin_vmax_from_folder, allow_pickle=True)
+        vmin = numpy_result["low_score"]
+        vmax = numpy_result["differences"].max()
+        vmin_max = [vmin, vmax]
     plot_averages(
         differences,
         [
@@ -310,6 +331,7 @@ def plot_average_trace_heatmap(
         model_name,
         kind,
         savepdf=os.path.join(pdf_output_dir, f"avg_{kind}.pdf"),
+        vmin_vmax=vmin_max,
     )
     print(
         "Biggest effect on {} on average in layer {}".format(
@@ -362,11 +384,6 @@ def plot_hidden_flow(
             pdf_output_dir, f'{str(numpy_result["answer"]).strip()}_{ex_id}_{kind}.pdf'
         )
         plot_trace_heatmap(numpy_result, savepdf=pdfname, modelname=mt.model_name)
-
-    # Save plot of average.
-    plot_average_trace_heatmap(
-        ds, cache_output_dir, pdf_output_dir, kind, mt.model_name, mt.tokenizer
-    )
 
 
 def main(args):
@@ -439,19 +456,24 @@ def main(args):
     print(f"Using noise level {noise_level}")
     for kind in [None, "mlp", "attn"]:
         print("Computing for", kind)
-        if args.only_plot_average:
-            plot_average_trace_heatmap(
-                ds, cache_hidden_flow, pdf_output_dir, kind, mt.model_name, mt.tokenizer
+        if not args.only_plot_average:
+            plot_hidden_flow(
+                mt,
+                ds,
+                cache_hidden_flow,
+                pdf_output_dir,
+                kind,
+                noise_level,
+                recompute_query_inference=args.recompute_query_inference,
             )
-            continue
-        plot_hidden_flow(
-            mt,
+        plot_average_trace_heatmap(
             ds,
             cache_hidden_flow,
             pdf_output_dir,
             kind,
-            noise_level,
-            recompute_query_inference=args.recompute_query_inference,
+            mt.model_name,
+            mt.tokenizer,
+            args.use_vmin_vmax_from_folder,
         )
 
 
@@ -498,6 +520,7 @@ if __name__ == "__main__":
     parser.add_argument("--filter_trivial", action="store_true")
     parser.add_argument("--keep_only_trivial", action="store_true")
     parser.add_argument("--resample_trivial", action="store_true")
+    parser.add_argument("--use_vmin_vmax_from_folder", type=str, default=None)
     args = parser.parse_args()
     if not args.model_name:
         args.model_name = args.model_name_or_path.replace("/", "__")
