@@ -230,7 +230,7 @@ def plot_averages(
             ax.set_xlabel(f"Center of interval of {window} restored {kindname} layers")
         cb = plt.colorbar(h)
         cb.ax.set_title("p(%)={:0.3}".format(high_score), y=-0.16, fontsize=10)
-        if not use_min_for_vmin:
+        if use_min_for_vmin:
             cb.set_ticks(ticks[np.argsort(ticks)])
             cb.set_ticklabels(tick_labels[np.argsort(ticks)])
         os.makedirs(os.path.dirname(pdf_filename), exist_ok=True)
