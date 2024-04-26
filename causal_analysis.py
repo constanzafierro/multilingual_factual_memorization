@@ -262,7 +262,7 @@ def plot_average_trace_heatmap(
     kind,
     model_name,
     tokenizer,
-    use_vmin_vmax_from_file=None,
+    use_vmin_vmax_from_folder=None,
 ):
     has_bos = tokenizer("some long text here")["input_ids"][0] == tokenizer.bos_token_id
     total_scores = collections.defaultdict(list)
@@ -314,8 +314,11 @@ def plot_average_trace_heatmap(
         ]
     )
     vmin_max = None
-    if use_vmin_vmax_from_file is not None:
-        numpy_result = np.load(use_vmin_vmax_from_file, allow_pickle=True)
+    if use_vmin_vmax_from_folder is not None:
+        numpy_result = np.load(
+            os.path.join(use_vmin_vmax_from_folder, f"avg_data_{kind}.npz"),
+            allow_pickle=True,
+        )
         vmin = numpy_result["low_score"]
         vmax = numpy_result["scores"].max()
         vmin_max = [vmin, vmax]
@@ -473,7 +476,7 @@ def main(args):
             kind,
             mt.model_name,
             mt.tokenizer,
-            args.use_vmin_vmax_from_file,
+            args.use_vmin_vmax_from_folder,
         )
 
 
@@ -520,7 +523,7 @@ if __name__ == "__main__":
     parser.add_argument("--filter_trivial", action="store_true")
     parser.add_argument("--keep_only_trivial", action="store_true")
     parser.add_argument("--resample_trivial", action="store_true")
-    parser.add_argument("--use_vmin_vmax_from_file", type=str, default=None)
+    parser.add_argument("--use_vmin_vmax_from_folder", type=str, default=None)
     args = parser.parse_args()
     if not args.model_name:
         args.model_name = args.model_name_or_path.replace("/", "__")
