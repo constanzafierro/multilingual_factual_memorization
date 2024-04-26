@@ -83,57 +83,59 @@ def is_trivial_example(objs, query):
     return False
 
 
-def get_memorized_ds(dataset_name, eval_df_filename):
-    def remove_punc(text):
-        exclude = set(string.punctuation)
-        return "".join(ch for ch in text if ch not in exclude)
+def remove_punc(text):
+    exclude = set(string.punctuation)
+    return "".join(ch for ch in text if ch not in exclude)
 
-    def get_start_ans(pred, gt_list):
-        start_idx = None
-        pred = pred.lower()
-        for gt in gt_list:
-            id_found = pred.find(gt.lower())
-            if id_found != -1 and (start_idx is None or start_idx > id_found):
-                start_idx = id_found
-        gt_without_punc = [remove_punc(gt) for gt in gt_list]
-        if start_idx is None and gt_list != gt_without_punc:
-            return get_start_ans(remove_punc(pred), gt_without_punc)
-        return start_idx
 
-    def add_exact_query(example, memorized_df, df_id_to_index):
-        row = memorized_df.iloc[df_id_to_index[example["id"]]]
-        start_index = int(row["start_answer"].item())
-        if start_index != 0:
-            try:
-                example["query_inference"] = (
-                    example["query"].strip()
-                    + " "
-                    + row["prediction"][:start_index].strip()
-                )
-            except Exception as e:
-                print("example in ds", example["query"])
-                print("row", row)
-                print("start_index", start_index)
-                print("prediction", row["prediction"])
-                raise (e)
-        else:
-            example["query_inference"] = example["query"]
-        return example
+def get_start_ans(pred, gt_list):
+    start_idx = None
+    pred = pred.lower()
+    for gt in gt_list:
+        id_found = pred.find(gt.lower())
+        if id_found != -1 and (start_idx is None or start_idx > id_found):
+            start_idx = id_found
+    gt_without_punc = [remove_punc(gt) for gt in gt_list]
+    if start_idx is None and gt_list != gt_without_punc:
+        return get_start_ans(remove_punc(pred), gt_without_punc)
+    return start_idx
 
-    inference_df = pd.read_json(eval_df_filename)
-    memorized_df = inference_df[inference_df.exact_match].copy()
-    ds = load_dataset(dataset_name)["train"]
-    ds = ds.filter(lambda ex: ex["id"] in set(memorized_df["id"].values))
-    # We might have run inference on more examples than the ones in the ds that we want to use.
-    memorized_df = memorized_df[memorized_df["id"].isin(set(ds["id"]))]
 
-    # Check how many trivial.
+def add_exact_query(example, memorized_df, df_id_to_index):
+    row = memorized_df.iloc[df_id_to_index[example["id"]]]
+    start_index = int(row["start_answer"].item())
+    if start_index != 0:
+        try:
+            example["query_inference"] = (
+                example["query"].strip() + " " + row["prediction"][:start_index].strip()
+            )
+        except Exception as e:
+            print("example in ds", example["query"])
+            print("row", row)
+            print("start_index", start_index)
+            print("prediction", row["prediction"])
+            raise (e)
+    else:
+        example["query_inference"] = example["query"]
+    return example
+
+
+def log_trivial_examples_counts(memorized_df, ds):
     ds_id_to_index = {ex["id"]: i for i, ex in enumerate(ds)}
     memorized_df["query"] = memorized_df.apply(
         lambda row: ds[ds_id_to_index[row["id"]]]["query"], axis=1
     )
     memorized_df["is_trivial"] = memorized_df.apply(
         lambda row: is_trivial_example(row["ground_truth"], row["query"]), axis=1
+    )
+    memorized_df["relation"] = memorized_df.apply(
+        lambda ex: ex["id"].split("_")[1], axis=1
+    )
+    memorized_df["template_id"] = memorized_df.apply(
+        lambda ex: ex["id"].split("_")[-1], axis=1
+    )
+    memorized_df["subj_id"] = memorized_df.apply(
+        lambda ex: ex["id"].split("_")[-2], axis=1
     )
     memorized_examples = (
         memorized_df[memorized_df.exact_match][
@@ -153,6 +155,18 @@ def get_memorized_ds(dataset_name, eval_df_filename):
             / len(memorized_df),
         }
     )
+
+
+def get_memorized_ds(dataset_name, eval_df_filename):
+    inference_df = pd.read_json(eval_df_filename)
+    memorized_df = inference_df[inference_df.exact_match].copy()
+    ds = load_dataset(dataset_name)["train"]
+    ds = ds.filter(lambda ex: ex["id"] in set(memorized_df["id"].values))
+    # We might have run inference on more examples than the ones in the ds that we want to use.
+    memorized_df = memorized_df[memorized_df["id"].isin(set(ds["id"]))]
+
+    # Check how many trivial.
+    log_trivial_examples_counts(memorized_df, ds)
 
     # Add 'query_inference' with all the tokens before the object.
     memorized_df["start_answer"] = memorized_df.apply(
