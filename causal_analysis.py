@@ -186,7 +186,7 @@ def plot_averages(
     savepdf,
     vmin_vmax=None,
 ):
-    def _plot_averages(pdf_filename, use_low_score_for_min=True):
+    def _plot_averages(pdf_filename, use_min_for_vmin=False):
         window = 10
         fig, ax = plt.subplots(figsize=(3.5, 2), dpi=200)
         ticks = np.array(
@@ -202,11 +202,11 @@ def plot_averages(
                 for i, label in enumerate(["(Min)", "(Noise)", "(Max)"])
             ]
         )
-        args = {"vmin": min(ticks)}
-        if use_low_score_for_min:
-            args = {"vmin": low_score}
+        args = {"vmin": low_score}
         if vmin_vmax is not None:
             args = {"vmin": vmin_vmax[0], "vmax": vmin_vmax[1]}
+        if use_min_for_vmin:
+            args = {"vmin": min(ticks)}
         h = ax.pcolor(
             scores,
             cmap={None: "Purples", "None": "Purples", "mlp": "Greens", "attn": "Reds"}[
@@ -230,7 +230,7 @@ def plot_averages(
             ax.set_xlabel(f"Center of interval of {window} restored {kindname} layers")
         cb = plt.colorbar(h)
         cb.ax.set_title("p(%)={:0.3}".format(high_score), y=-0.16, fontsize=10)
-        if not use_low_score_for_min:
+        if not use_min_for_vmin:
             cb.set_ticks(ticks[np.argsort(ticks)])
             cb.set_ticklabels(tick_labels[np.argsort(ticks)])
         os.makedirs(os.path.dirname(pdf_filename), exist_ok=True)
@@ -250,7 +250,7 @@ def plot_averages(
 
     _plot_averages(
         os.path.join(os.path.dirname(savepdf), "ticks_" + os.path.basename(savepdf)),
-        use_low_score_for_min=False,
+        use_min_for_vmin=True,
     )
     _plot_averages(savepdf)
 
