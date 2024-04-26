@@ -394,7 +394,9 @@ def main(args):
     if args.filter_trivial:
         plots_folder = "plots_filter_trivial"
     if args.resample_trivial:
-        plots_folder = "resample_trivial"
+        plots_folder = "plots_resample_trivial"
+    if args.keep_only_trivial:
+        plots_folder = "plots_only_trivial"
     pdf_output_dir = os.path.join(cache_dir, plots_folder)
     wandb.config["cache_output_dir"] = cache_dir
     wandb.config["plots_output_dir"] = pdf_output_dir
