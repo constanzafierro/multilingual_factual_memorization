@@ -237,7 +237,7 @@ def plot_averages(
         plt.savefig(pdf_filename, bbox_inches="tight")
         plt.close()
 
-    data_filename = os.path.join(os.path.dirname(savepdf), "avg_data.npz")
+    data_filename = os.path.join(os.path.dirname(savepdf), f"avg_data_{kind}.npz")
     numpy_result = {
         "scores": scores,
         "names_and_counts": names_and_counts,
