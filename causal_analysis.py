@@ -419,6 +419,7 @@ def main(args):
         args.only_subset,
         args.filter_trivial,
         args.resample_trivial,
+        args.keep_only_trivial,
     )
     print("Computing causal analysis for", len(ds))
     wandb.run.summary["n_examples_causal_analysis"] = len(ds)
@@ -493,6 +494,7 @@ if __name__ == "__main__":
     parser.add_argument("--only_plot_average", action="store_true")
     parser.add_argument("--recompute_query_inference", action="store_true")
     parser.add_argument("--filter_trivial", action="store_true")
+    parser.add_argument("--keep_only_trivial", action="store_true")
     parser.add_argument("--resample_trivial", action="store_true")
     args = parser.parse_args()
     if not args.model_name:

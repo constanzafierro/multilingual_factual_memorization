@@ -135,10 +135,22 @@ def get_memorized_ds(dataset_name, eval_df_filename):
     memorized_df["is_trivial"] = memorized_df.apply(
         lambda row: is_trivial_example(row["ground_truth"], row["query"]), axis=1
     )
+    memorized_examples = (
+        memorized_df[memorized_df.exact_match][
+            ["relation", "subj_id", "template_id", "is_trivial"]
+        ]
+        .groupby(by=["relation", "subj_id", "is_trivial"], as_index=False)
+        .count()
+    )
     wandb.log(
         {
+            # We don't count paraphrases as separate examples.
+            "memorized_examples": len(memorized_examples),
+            "trivial_memorization_examples": len(
+                memorized_examples[memorized_examples.is_trivial]
+            ),
             "trivial_memorization": len(memorized_df[memorized_df.is_trivial])
-            / len(memorized_df)
+            / len(memorized_df),
         }
     )
 
@@ -194,6 +206,7 @@ def get_memorized_dataset(
     only_subset,
     filter_trivial=False,
     resample_trivial=False,
+    keep_only_trivial=False,
 ):
     if dataset_name == "known_facts_rome":
         knowns = KnownsDataset(DATA_DIR)
@@ -249,6 +262,8 @@ def get_memorized_dataset(
             ds = ds_sample
     if filter_trivial:
         ds = ds.filter(lambda ex: not is_trivial_example(ex["obj_label"], ex["query"]))
+    if keep_only_trivial:
+        ds = ds.filter(lambda ex: is_trivial_example(ex["obj_label"], ex["query"]))
     wandb.run.summary["trivial_in_sample"] = len(
         ds.filter(lambda ex: is_trivial_example(ex["obj_label"], ex["query"]))
     )
