@@ -260,7 +260,7 @@ def get_memorized_dataset(
             extra_sample = non_trivial_non_selected_ds.select(
                 rng.choice(
                     len(non_trivial_non_selected_ds),
-                    len(ds_sample_trivial),
+                    min(len(ds_sample_trivial), len(non_trivial_non_selected_ds)),
                     replace=False,
                 )
             )
