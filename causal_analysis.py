@@ -264,7 +264,9 @@ def plot_average_trace_heatmap(
     tokenizer,
     use_vmin_vmax_from_folder=None,
 ):
-    has_bos = tokenizer("some long text here")["input_ids"][0] == tokenizer.bos_token_id
+    has_bos = (
+        tokenizer("some long text here")["input_ids"][0] in tokenizer.all_special_ids
+    )
     total_scores = collections.defaultdict(list)
     for ex in tqdm(ds, desc="Average Examples"):
         results_file = os.path.join(cache_output_dir, f"{ex['id']}{kind}.npz")
