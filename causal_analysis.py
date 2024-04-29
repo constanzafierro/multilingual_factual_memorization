@@ -418,6 +418,10 @@ def main(args):
     if args.keep_only_trivial:
         plots_folder = "plots_only_trivial"
     pdf_output_dir = os.path.join(cache_dir, plots_folder)
+    if args.use_vmin_vmax_from_folder is not None:
+        args.use_vmin_vmax_from_folder = os.path.join(
+            cache_dir, args.use_vmin_vmax_from_folder
+        )
     wandb.config["cache_output_dir"] = cache_dir
     wandb.config["plots_output_dir"] = pdf_output_dir
     os.makedirs(cache_hidden_flow, exist_ok=True)
