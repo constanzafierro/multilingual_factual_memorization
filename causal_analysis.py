@@ -12,7 +12,6 @@ import wandb
 from tqdm import tqdm
 from dataset.data_utils import get_memorized_dataset, find_token_range
 from third_party.rome.experiments.causal_trace import (
-    ModelAndTokenizer,
     collect_embedding_std,
     decode_tokens,
     layername,
@@ -186,7 +185,7 @@ def plot_averages(
     savepdf,
     vmin_vmax=None,
 ):
-    def _plot_averages(pdf_filename, use_min_for_vmin=False):
+    def _plot_averages(pdf_filename, use_min_for_vmin=False, vmin_vmax=None):
         window = 10
         fig, ax = plt.subplots(figsize=(3.5, 2), dpi=200)
         ticks = np.array(
@@ -252,7 +251,16 @@ def plot_averages(
         os.path.join(os.path.dirname(savepdf), "ticks_" + os.path.basename(savepdf)),
         use_min_for_vmin=True,
     )
-    _plot_averages(savepdf)
+    if vmin_vmax is not None:
+        _plot_averages(
+            os.path.join(
+                os.path.dirname(savepdf), "vmin_vmax_" + os.path.basename(savepdf)
+            ),
+            vmin_vmax=vmin_vmax,
+        )
+        _plot_averages(savepdf, vmin_vmax=None)
+    else:
+        _plot_averages(savepdf, vmin_vmax=vmin_vmax)
 
 
 def plot_average_trace_heatmap(
