@@ -414,10 +414,13 @@ def main(args):
     cache_hidden_flow = os.path.join(cache_dir, "cache_hidden_flow")
     plots_folder = "plots"
     if args.filter_trivial:
+        wandb.run.name += " filter_trivial"
         plots_folder = "plots_filter_trivial"
     if args.resample_trivial:
+        wandb.run.name += " resample_trivial"
         plots_folder = "plots_resample_trivial"
     if args.keep_only_trivial:
+        wandb.run.name += " only_trivial"
         plots_folder = "plots_only_trivial"
     pdf_output_dir = os.path.join(cache_dir, plots_folder)
     if args.use_vmin_vmax_from_folder is not None:
