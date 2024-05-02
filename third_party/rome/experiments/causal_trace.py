@@ -485,10 +485,15 @@ class ModelAndTokenizer:
         )
 
 
-def layername(model, num, kind=None):
+def layername(model, num=-1, kind=None):
     if hasattr(model, "transformer"):
-        if kind == "embed":
-            return "transformer.wte"
+        kind_to_layer = {
+            "embed": "transformer.wte",
+            "layers": "transformer.h",
+            "lm_head": "lm_head.weight",
+        }
+        if kind in kind_to_layer:
+            return kind_to_layer[kind]
         return f'transformer.h.{num}{"" if kind is None else "." + kind}'
     if hasattr(model, "gpt_neox"):
         if kind == "embed":
@@ -497,8 +502,13 @@ def layername(model, num, kind=None):
             kind = "attention"
         return f'gpt_neox.layers.{num}{"" if kind is None else "." + kind}'
     if isinstance(model, XGLMForCausalLM):
-        if kind == "embed":
-            return "model.embed_tokens"
+        kind_to_layer = {
+            "embed": "model.embed_tokens",
+            "layers": "model.layers",
+            "lm_head": "lm_head.weight",
+        }
+        if kind in kind_to_layer:
+            return kind_to_layer[kind]
         kind_map = {"attn": "self_attn", "mlp": "fc2"}
         return f'model.layers.{num}{"" if kind is None else "." + kind_map[kind]}'
     assert False, "unknown transformer structure"
