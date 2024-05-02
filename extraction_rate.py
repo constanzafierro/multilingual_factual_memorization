@@ -132,7 +132,7 @@ def main(args):
         with torch.no_grad():
             outputs = model(**inp)
         remove_hooks(hooks)
-        token_pred = torch.argmax(outputs.logits[0, -1, :])
+        token_pred = torch.argmax(outputs.logits[0, -1, :]).item()
 
         for layer in range(total_layers):
             for k in ["attn_", "mlp_", "out_"]:
