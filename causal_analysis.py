@@ -478,15 +478,19 @@ def main(args):
     os.makedirs(cache_hidden_flow, exist_ok=True)
     os.makedirs(pdf_output_dir, exist_ok=True)
 
-    mt = load_model_and_tok(args)
-    print("Testing prediction...")
-    print(
-        predict_token(
-            mt,
-            ["Megan Rapinoe plays the sport of", "The Space Needle is in the city of"],
-            return_p=True,
+    mt = load_model_and_tok(args, only_tokenizer=args.only_plot_average)
+    if not args.only_plot_average:
+        print("Testing prediction...")
+        print(
+            predict_token(
+                mt,
+                [
+                    "Megan Rapinoe plays the sport of",
+                    "The Space Needle is in the city of",
+                ],
+                return_p=True,
+            )
         )
-    )
 
     ds = get_memorized_dataset(
         args.dataset_name,
