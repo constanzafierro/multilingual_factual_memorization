@@ -166,7 +166,8 @@ def get_memorized_ds(dataset_name, eval_df_filename):
     memorized_df = memorized_df[memorized_df["id"].isin(set(ds["id"]))]
 
     # Check how many trivial.
-    log_trivial_examples_counts(memorized_df, ds)
+    if wandb.run is not None:
+        log_trivial_examples_counts(memorized_df, ds)
 
     # Add 'query_inference' with all the tokens before the object.
     memorized_df["start_answer"] = memorized_df.apply(
@@ -180,7 +181,8 @@ def get_memorized_ds(dataset_name, eval_df_filename):
                 len(none_values), eval_df_filename, dataset_name
             )
         )
-        wandb.run.summary["answer_not_found"] = len(none_values)
+        if wandb.run is not None:
+            wandb.run.summary["answer_not_found"] = len(none_values)
         memorized_df = memorized_df[~memorized_df.start_answer.isnull()]
         ds = ds.filter(lambda ex: ex["id"] in set(memorized_df["id"].values))
     df_id_to_index = {id_: i for i, id_ in enumerate(memorized_df.id.values)}
@@ -239,7 +241,8 @@ def get_memorized_dataset(
         f"{language}--{dataset_name.split('/')[1]}--{model_name}",
         "eval_per_example_records.json",
     )
-    wandb.config["eval_df_filename"] = eval_df_filename
+    if wandb.run is not None:
+        wandb.config["eval_df_filename"] = eval_df_filename
     ds = get_memorized_ds(dataset_name, eval_df_filename)
     ds = filter_paraphrases(ds)
     if only_subset and len(ds) > 1000:
@@ -278,7 +281,8 @@ def get_memorized_dataset(
         ds = ds.filter(lambda ex: not is_trivial_example(ex["obj_label"], ex["query"]))
     if keep_only_trivial:
         ds = ds.filter(lambda ex: is_trivial_example(ex["obj_label"], ex["query"]))
-    wandb.run.summary["trivial_in_sample"] = len(
-        ds.filter(lambda ex: is_trivial_example(ex["obj_label"], ex["query"]))
-    )
+    if wandb.run is not None:
+        wandb.run.summary["trivial_in_sample"] = len(
+            ds.filter(lambda ex: is_trivial_example(ex["obj_label"], ex["query"]))
+        )
     return ds
