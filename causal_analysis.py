@@ -177,6 +177,7 @@ def trace_important_window(
 
 def plot_averages(
     scores,
+    differences,
     names_and_counts,
     low_score,
     high_score,
@@ -239,6 +240,7 @@ def plot_averages(
     data_filename = os.path.join(os.path.dirname(savepdf), f"avg_data_{kind}.npz")
     numpy_result = {
         "scores": scores,
+        "differences": differences,
         "names_and_counts": names_and_counts,
         "low_score": low_score,
         "high_score": high_score,
@@ -304,6 +306,7 @@ def plot_average_trace_heatmap(
         total_scores["last_token"].append(numpy_result["scores"][-1])
         total_scores["low_score"].append(numpy_result["low_score"])
         total_scores["high_score"].append(numpy_result["high_score"])
+    total_scores = {k: np.array(s) for k, s in total_scores.items()}
     agg_tokens_keys = [
         "bos",
         "before_subj",
@@ -316,9 +319,16 @@ def plot_average_trace_heatmap(
         "after_subj_last",
         "last_token",
     ]
-    differences = np.array(
+    scores = np.array(
         [
             np.mean(total_scores[k], axis=0)
+            for k in agg_tokens_keys
+            if len(total_scores[k]) > 0
+        ]
+    )
+    differences = np.array(
+        [
+            np.mean(total_scores[k] - total_scores["low_score"], axis=0)
             for k in agg_tokens_keys
             if len(total_scores[k]) > 0
         ]
@@ -333,6 +343,7 @@ def plot_average_trace_heatmap(
         vmax = numpy_result["scores"].max()
         vmin_max = [vmin, vmax]
     plot_averages(
+        scores,
         differences,
         [
             (k, len(total_scores[k]))
@@ -356,9 +367,9 @@ def plot_average_trace_heatmap(
             np.mean(total_scores["last_subj_token"], axis=0)
         )
         p_noise = np.mean(total_scores["low_score"])
-        p_min = differences.min()
+        p_min = scores.min()
         wandb.summary[f"significant_{kind}"] = (
-            p_noise + (p_noise - p_min) < differences.max()
+            p_noise + (p_noise - p_min) < scores.max()
         )
 
 
