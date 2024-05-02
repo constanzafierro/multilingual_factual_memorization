@@ -328,7 +328,13 @@ def plot_average_trace_heatmap(
     )
     differences = np.array(
         [
-            np.mean(total_scores[k] - total_scores["low_score"], axis=0)
+            np.mean(
+                total_scores[k]
+                - np.tile(
+                    total_scores["low_score"].reshape(-1, 1), total_scores[k].shape[1]
+                ),
+                axis=0,
+            )
             for k in agg_tokens_keys
             if len(total_scores[k]) > 0
         ]
