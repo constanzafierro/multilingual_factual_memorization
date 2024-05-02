@@ -177,7 +177,6 @@ def trace_important_window(
 
 def plot_averages(
     scores,
-    differences,
     names_and_counts,
     low_score,
     high_score,
@@ -237,18 +236,6 @@ def plot_averages(
         plt.savefig(pdf_filename, bbox_inches="tight")
         plt.close()
 
-    data_filename = os.path.join(os.path.dirname(savepdf), f"avg_data_{kind}.npz")
-    numpy_result = {
-        "scores": scores,
-        "differences": differences,
-        "names_and_counts": names_and_counts,
-        "low_score": low_score,
-        "high_score": high_score,
-        "modelname": modelname,
-        "kind": kind,
-    }
-    np.savez(data_filename, **numpy_result)
-
     _plot_averages(
         os.path.join(os.path.dirname(savepdf), "ticks_" + os.path.basename(savepdf)),
         use_min_for_vmin=True,
@@ -265,48 +252,43 @@ def plot_averages(
         _plot_averages(savepdf, vmin_vmax=vmin_vmax)
 
 
-def plot_average_trace_heatmap(
-    ds,
-    cache_output_dir,
-    pdf_output_dir,
-    kind,
-    model_name,
-    tokenizer,
-    use_vmin_vmax_from_folder=None,
-):
+def agg_causal_analysis_results(tokenizer, ds, cache_output_dir, kind):
     has_bos = (
         tokenizer("some long text here")["input_ids"][0] in tokenizer.all_special_ids
     )
-    total_scores = collections.defaultdict(list)
+    all_scores = []
     for ex in tqdm(ds, desc="Average Examples"):
         results_file = os.path.join(cache_output_dir, f"{ex['id']}{kind}.npz")
         numpy_result = np.load(
             os.path.join(cache_output_dir, results_file), allow_pickle=True
         )
+        ex_scores = collections.defaultdict(list)
         first_subj_token = numpy_result["subject_range"][0]
         last_subj_token = numpy_result["subject_range"][-1] - 1
-        total_scores["last_subj_token"].append(numpy_result["scores"][last_subj_token])
-        total_scores["first_subj_token"].append(
-            numpy_result["scores"][first_subj_token]
-        )
+        ex_scores["last_subj_token"].append(numpy_result["scores"][last_subj_token])
+        ex_scores["first_subj_token"].append(numpy_result["scores"][first_subj_token])
         for i in range(0, numpy_result["subject_range"][0]):
             if i == 0 and has_bos:
-                total_scores["bos"].append(numpy_result["scores"][i])
+                ex_scores["bos"].append(numpy_result["scores"][i])
             else:
-                total_scores["before_subj"].append(numpy_result["scores"][i])
+                ex_scores["before_subj"].append(numpy_result["scores"][i])
         for i in range(first_subj_token + 1, last_subj_token):
-            total_scores["mid_subj_tokens"].append(numpy_result["scores"][i])
+            ex_scores["mid_subj_tokens"].append(numpy_result["scores"][i])
         for i in range(first_subj_token, last_subj_token + 1):
-            total_scores["all_subj_tokens"].append(numpy_result["scores"][i])
+            ex_scores["all_subj_tokens"].append(numpy_result["scores"][i])
         if last_subj_token < len(numpy_result["scores"]) - 1:
             for i in range(last_subj_token, len(numpy_result["scores"])):
-                total_scores["after_subj"].append(numpy_result["scores"][i])
-            total_scores["after_subj_first"].append(numpy_result["scores"][0])
-            total_scores["after_subj_last"].append(numpy_result["scores"][-1])
-        total_scores["last_token"].append(numpy_result["scores"][-1])
-        total_scores["low_score"].append(numpy_result["low_score"])
-        total_scores["high_score"].append(numpy_result["high_score"])
-    total_scores = {k: np.array(s) for k, s in total_scores.items()}
+                ex_scores["after_subj"].append(numpy_result["scores"][i])
+            ex_scores["after_subj_first"].append(numpy_result["scores"][0])
+            ex_scores["after_subj_last"].append(numpy_result["scores"][-1])
+        ex_scores["last_token"].append(numpy_result["scores"][-1])
+        ex_scores["low_score"].append(numpy_result["low_score"])
+        ex_scores["high_score"].append(numpy_result["high_score"])
+        all_scores.append(ex_scores)
+    return all_scores
+
+
+def compute_averages(all_scores):
     agg_tokens_keys = [
         "bos",
         "before_subj",
@@ -319,26 +301,68 @@ def plot_average_trace_heatmap(
         "after_subj_last",
         "last_token",
     ]
-    scores = np.array(
-        [
-            np.mean(total_scores[k], axis=0)
-            for k in agg_tokens_keys
-            if len(total_scores[k]) > 0
+    scores = []
+    scores_macro = []
+    differences = []
+    differences_macro = []
+    counts = []
+    final_keys = []
+    for k in agg_tokens_keys:
+        k_scores = [ex_scores[k] for ex_scores in all_scores if k in ex_scores]
+        if not k_scores:
+            continue
+        final_keys.append(k)
+        counts.append(sum([len(l) for l in k_scores]))
+        k_diffs = [
+            np.array(ex_scores[k]) - ex_scores["low_score"][0]
+            for ex_scores in all_scores
+            if k in ex_scores
         ]
+        scores.append(np.mean([i for l in k_scores for i in l], axis=0))
+        differences.append(np.mean([i for l in k_diffs for i in l], axis=0))
+        scores_macro.append(np.mean([np.mean(s, axis=0) for s in k_scores], axis=0))
+        differences_macro.append(np.mean([np.mean(s, axis=0) for s in k_diffs], axis=0))
+    scores = np.array(scores)
+    scores_macro = np.array(scores_macro)
+    differences = np.array(differences)
+    differences_macro = np.array(differences_macro)
+    return {
+        "scores": np.array(scores),
+        "scores_macro": np.array(scores_macro),
+        "differences": np.array(differences),
+        "differences_macro": np.array(differences_macro),
+        "agg_tokens_keys": final_keys,
+        "counts": counts,
+        "low_score": np.mean([ex["low_score"] for ex in all_scores]),
+        "high_score": np.mean([ex["high_score"] for ex in all_scores]),
+    }
+
+
+def plot_average_trace_heatmap(
+    ds,
+    cache_output_dir,
+    pdf_output_dir,
+    kind,
+    model_name,
+    tokenizer,
+    use_vmin_vmax_from_folder=None,
+):
+    all_scores = agg_causal_analysis_results(tokenizer, ds, cache_output_dir, kind)
+    averaged_scores = compute_averages(all_scores)
+    names_and_counts = list(
+        zip(averaged_scores["agg_tokens_keys"], averaged_scores["counts"])
     )
-    differences = np.array(
-        [
-            np.mean(
-                total_scores[k]
-                - np.tile(
-                    total_scores["low_score"].reshape(-1, 1), total_scores[k].shape[1]
-                ),
-                axis=0,
-            )
-            for k in agg_tokens_keys
-            if len(total_scores[k]) > 0
-        ]
+
+    np.savez(
+        os.path.join(pdf_output_dir, f"avg_data_{kind}.npz"),
+        **{
+            "names_and_counts": names_and_counts,
+            "model_name": model_name,
+            "kind": kind,
+            **averaged_scores,
+        },
     )
+
     vmin_max = None
     if use_vmin_vmax_from_folder is not None:
         numpy_result = np.load(
@@ -349,33 +373,30 @@ def plot_average_trace_heatmap(
         vmax = numpy_result["scores"].max()
         vmin_max = [vmin, vmax]
     plot_averages(
-        scores,
-        differences,
-        [
-            (k, len(total_scores[k]))
-            for k in agg_tokens_keys
-            if len(total_scores[k]) > 0
-        ],
-        np.mean(total_scores["low_score"]),
-        np.mean(total_scores["high_score"]),
+        averaged_scores["scores"],
+        names_and_counts,
+        averaged_scores["low_score"],
+        averaged_scores["high_score"],
         model_name,
         kind,
         savepdf=os.path.join(pdf_output_dir, f"avg_{kind}.pdf"),
         vmin_vmax=vmin_max,
     )
+    biggest_effect = np.argmax(
+        np.mean([ex["last_subj_token"] for ex in all_scores], axis=0)
+    )
     print(
         "Biggest effect on {} on average in layer {}".format(
-            kind, np.argmax(np.mean(total_scores["last_subj_token"], axis=0))
+            kind,
+            biggest_effect,
         )
     )
     if wandb.run is not None:
-        wandb.summary[f"{kind}_avg_best_layer"] = np.argmax(
-            np.mean(total_scores["last_subj_token"], axis=0)
-        )
-        p_noise = np.mean(total_scores["low_score"])
-        p_min = scores.min()
+        wandb.summary[f"{kind}_avg_best_layer"] = biggest_effect
+        p_noise = (np.mean([ex["low_score"] for ex in all_scores]),)
+        p_min = averaged_scores["scores"].min()
         wandb.summary[f"significant_{kind}"] = (
-            p_noise + (p_noise - p_min) < scores.max()
+            p_noise + (p_noise - p_min) < averaged_scores["scores"].max()
         )
 
 
