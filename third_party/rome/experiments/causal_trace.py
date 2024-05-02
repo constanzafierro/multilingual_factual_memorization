@@ -490,7 +490,7 @@ def layername(model, num=-1, kind=None):
         kind_to_layer = {
             "embed": "transformer.wte",
             "layers": "transformer.h",
-            "lm_head": "lm_head.weight",
+            "lm_head": "lm_head",
         }
         if kind in kind_to_layer:
             return kind_to_layer[kind]
@@ -505,7 +505,7 @@ def layername(model, num=-1, kind=None):
         kind_to_layer = {
             "embed": "model.embed_tokens",
             "layers": "model.layers",
-            "lm_head": "lm_head.weight",
+            "lm_head": "lm_head",
         }
         if kind in kind_to_layer:
             return kind_to_layer[kind]

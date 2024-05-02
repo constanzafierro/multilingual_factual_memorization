@@ -1,7 +1,6 @@
 import argparse
 import json
 import os
-from glob import glob
 
 import numpy as np
 import pandas as pd
@@ -14,8 +13,8 @@ from transformers import (
     GPT2LMHeadModel,
     XGLMForCausalLM,
 )
-from dataset.data_utils import get_memorized_dataset
 
+from dataset.data_utils import get_memorized_dataset
 from third_party.rome.experiments.causal_trace import layername
 from third_party.rome.util.nethook import get_module
 
@@ -104,7 +103,7 @@ def main(args):
     tokenizer = AutoTokenizer.from_pretrained(args.model_name_or_path, use_fast=False)
 
     total_layers = len(get_module(model, layername(model, kind="layers")))
-    lm_head = get_module(model, layername(model, kind="lm_head"))
+    lm_head = get_module(model, layername(model, kind="lm_head")).weight
 
     ds = get_memorized_dataset(
         args.dataset_name,
