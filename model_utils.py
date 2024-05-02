@@ -10,7 +10,7 @@ from third_party.rome.experiments.causal_trace import ModelAndTokenizer
 
 def load_model_and_tok(args, only_tokenizer=False):
     device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
-    model = None
+    model = ""
     if not only_tokenizer:
         model = AutoModelForCausalLM.from_pretrained(args.model_name_or_path).to(device)
         accelerator = Accelerator()
