@@ -97,7 +97,7 @@ def main(args):
         wandb.run.name += " only_trivial"
         data_id += "_only_trivial"
     args.output_folder = os.path.join(args.output_folder, args.model_name, data_id)
-    os.makedirs(args.output_dir, exist_ok=True)
+    os.makedirs(args.output_folder, exist_ok=True)
 
     device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
     model = AutoModelForCausalLM.from_pretrained(args.model_name_or_path).to(device)
@@ -156,20 +156,13 @@ def main(args):
                     }
                 )
     df = pd.DataFrame(records)
-    df.to_csv(
-        os.path.join(
-            # TODO: re check output dir
-            args.output_dir,
-            "extraction_rate.csv",
-        ),
-        index=False,
-    )
-    with open(os.path.join(args.output_dir, "args.json"), "w") as f:
+    df.to_csv(os.path.join(args.output_folder, "extraction_rate.csv"), index=False)
+    with open(os.path.join(args.output_folder, "args.json"), "w") as f:
         json.dump(args.__dict__, f, indent=2)
     df[["proj_vec", "language", "relation", "layer", "cand_in_top_1"]].groupby(
         by=["proj_vec", "language", "relation", "layer"], as_index=False
     ).mean().to_csv(
-        os.path.join(args.output_dir, "extraction_rate_relation_avg.csv"),
+        os.path.join(args.output_folder, "extraction_rate_relation_avg.csv"),
         index=False,
     )
 
