@@ -177,7 +177,7 @@ def main(args):
 if __name__ == "__main__":
     parser = argparse.ArgumentParser()
     parser.add_argument("--model_name_or_path", type=str, required=True)
-    parser.add_argument("--model_name", type=str, required=True)
+    parser.add_argument("--model_name", type=str)
     parser.add_argument(
         "--dataset_name",
         required=True,
