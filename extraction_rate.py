@@ -125,9 +125,9 @@ def main(args):
             model,
             total_layers,
             last_token_index,
-            hook_mlp=True,
-            hook_attn=True,
-            hook_out=True,
+            hook_mlp="mlp_" in args.hook_modules,
+            hook_attn="attn_" in args.hook_modules,
+            hook_out="out_" in args.hook_modules,
         )
         with torch.no_grad():
             outputs = model(**inp)
@@ -135,11 +135,19 @@ def main(args):
         token_pred = torch.argmax(outputs.logits[0, -1, :]).item()
 
         for layer in range(total_layers):
-            for k in ["attn_", "mlp_", "out_"]:
+            for k in args.hook_modules:
                 out = model.activations_[f"{k}{layer}"][0]
                 proj = (lm_head @ out).detach().cpu().numpy()
-                ind = np.argsort(-proj, axis=-1)
+                ind = np.argsort(-proj, axis=-1)  # Descending order.
                 pred_tok_rank = np.where(ind == token_pred)[0][0]
+                extra_items = {}
+                if args.store_topk:
+                    extra_items = {
+                        "topk_token_ids": ind[: args.store_topk],
+                        "topk_tokens": tokenizer.convert_ids_to_tokens(
+                            ind[: args.store_topk]
+                        ),
+                    }
                 records.append(
                     {
                         "id": ex["id"],
@@ -152,16 +160,20 @@ def main(args):
                         "pred_tok_rank": pred_tok_rank,
                         "pred_tok_score": proj[ind[pred_tok_rank]],
                         "pred_in_top_1": pred_tok_rank == 0,
+                        **extra_items,
                     }
                 )
     df = pd.DataFrame(records)
-    df.to_csv(os.path.join(args.output_folder, "extraction_rate.csv"), index=False)
+    filename = "extraction_events"
+    if args.store_topk:
+        filename += f"_top{args.store_topk}"
+    df.to_csv(os.path.join(args.output_folder, f"{filename}.csv"), index=False)
     with open(os.path.join(args.output_folder, "args.json"), "w") as f:
         json.dump(args.__dict__, f, indent=2)
-    df[["proj_vec", "language", "relation", "layer", "cand_in_top_1"]].groupby(
+    df[["proj_vec", "language", "relation", "layer"]].groupby(
         by=["proj_vec", "language", "relation", "layer"], as_index=False
     ).mean().to_csv(
-        os.path.join(args.output_folder, "extraction_rate_relation_avg.csv"),
+        os.path.join(args.output_folder, f"{filename}_relation_avg.csv"),
         index=False,
     )
 
@@ -190,6 +202,8 @@ if __name__ == "__main__":
     parser.add_argument("--filter_trivial", action="store_true")
     parser.add_argument("--keep_only_trivial", action="store_true")
     parser.add_argument("--resample_trivial", action="store_true")
+    parser.add_argument("--hook_modules", nargs="+", default=["attn_", "mlp_", "out_"])
+    parser.add_argument("--store_topk", type=int)
     parser.add_argument("--output_folder", type=str, required=True)
     args = parser.parse_args()
 
