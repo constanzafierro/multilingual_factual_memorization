@@ -95,6 +95,8 @@ def main(args):
     if args.keep_only_trivial:
         wandb.run.name += " only_trivial"
         data_id += "_only_trivial"
+    if args.store_topk:
+        wandb.run.name = f"(top{args.store_topk}) {wandb.run.name}"
     args.output_folder = os.path.join(args.output_folder, args.model_name, data_id)
     os.makedirs(args.output_folder, exist_ok=True)
 
