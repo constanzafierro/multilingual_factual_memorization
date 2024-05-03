@@ -97,6 +97,11 @@ def main(args):
         data_id += "_only_trivial"
     if args.store_topk:
         wandb.run.name = f"(top{args.store_topk}) {wandb.run.name}"
+    args.output_folder = os.path.normpath(args.output_folder)
+    args.output_folder = os.path.join(
+        os.path.dirname(args.output_folder),
+        os.path.basename(args.output_folder) + f"_top{args.store_topk}",
+    )
     args.output_folder = os.path.join(args.output_folder, args.model_name, data_id)
     os.makedirs(args.output_folder, exist_ok=True)
 
@@ -167,8 +172,6 @@ def main(args):
                 )
     df = pd.DataFrame(records)
     filename = "extraction_events"
-    if args.store_topk:
-        filename += f"_top{args.store_topk}"
     df.to_csv(os.path.join(args.output_folder, f"{filename}.csv"), index=False)
     with open(os.path.join(args.output_folder, "args.json"), "w") as f:
         json.dump(args.__dict__, f, indent=2)
