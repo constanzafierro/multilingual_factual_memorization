@@ -97,12 +97,13 @@ def main(args):
         data_id += "_only_trivial"
     if args.store_topk:
         wandb.run.name = f"(top{args.store_topk}) {wandb.run.name}"
-    args.output_folder = os.path.normpath(args.output_folder)
-    args.output_folder = os.path.join(
-        os.path.dirname(args.output_folder),
-        os.path.basename(args.output_folder) + f"_top{args.store_topk}",
-    )
+        args.output_folder = os.path.normpath(args.output_folder)
+        args.output_folder = os.path.join(
+            os.path.dirname(args.output_folder),
+            os.path.basename(args.output_folder) + f"_top{args.store_topk}",
+        )
     args.output_folder = os.path.join(args.output_folder, args.model_name, data_id)
+    wandb.config["final_output_dir"] = args.output_folder
     os.makedirs(args.output_folder, exist_ok=True)
 
     device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
@@ -215,7 +216,7 @@ if __name__ == "__main__":
     if not args.model_name:
         args.model_name = args.model_name_or_path.replace("/", "__")
 
-    run_name = args.model_name_or_path
+    run_name = "{} {}".format(args.model_name_or_path, args.language)
     if "WANDB_NAME" in os.environ:
         run_name = os.getenv("WANDB_NAME")
     wandb.init(project="xfact_extraction_rate", name=run_name, config=args)
