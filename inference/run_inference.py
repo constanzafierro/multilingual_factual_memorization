@@ -10,18 +10,17 @@ from tqdm import tqdm
 from transformers import (
     AutoModelForCausalLM,
     AutoModelForSeq2SeqLM,
-    AutoTokenizer,
     BloomTokenizerFast,
     GenerationConfig,
+    GPT2TokenizerFast,
     LlamaTokenizer,
     LlamaTokenizerFast,
     PreTrainedTokenizerFast,
     T5TokenizerFast,
     XGLMTokenizerFast,
-    GPT2TokenizerFast,
 )
 
-from dataset.pararel_utils import SUBJECT_QCODE
+from model_utils import load_tokenizer
 
 device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
 NUM_BEAMS = 1
@@ -209,16 +208,7 @@ def main(args):
     wandb.config["final_dir"] = experiment_dir
 
     print("Loading model")
-    tokenizer_args = {}
-    if (
-        "alpaca" in args.model_name_or_path
-        or "llama" in args.model_name_or_path.lower()
-    ):
-        # the fact tokenizer causes issues with protobuf and tokenizers libraries
-        tokenizer_args = {"use_fast": False}
-    elif "polylm" in args.model_name_or_path:
-        tokenizer_args = {"legacy": False, "use_fast": False}
-    tokenizer = AutoTokenizer.from_pretrained(args.model_name_or_path, **tokenizer_args)
+    tokenizer = load_tokenizer(args.model_name_or_path)
 
     if "t5" in args.model_name_or_path:
         model = AutoModelForSeq2SeqLM.from_pretrained(

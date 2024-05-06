@@ -14,7 +14,8 @@ from transformers import (
     XGLMForCausalLM,
 )
 
-from dataset.data_utils import get_memorized_dataset, find_token_range
+from dataset.data_utils import find_token_range, get_memorized_dataset
+from model_utils import load_tokenizer
 from third_party.rome.experiments.causal_trace import layername
 from third_party.rome.util.nethook import get_module
 
@@ -111,7 +112,7 @@ def main(args):
 
     device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
     model = AutoModelForCausalLM.from_pretrained(args.model_name_or_path).to(device)
-    tokenizer = AutoTokenizer.from_pretrained(args.model_name_or_path, use_fast=False)
+    tokenizer = load_tokenizer(args.model_name_or_path)
 
     total_layers = len(get_module(model, layername(model, kind="layers")))
     lm_head = get_module(model, layername(model, kind="lm_head")).weight
