@@ -14,9 +14,18 @@ from transformers import (
     XGLMForCausalLM,
 )
 
-from dataset.data_utils import get_memorized_dataset
+from dataset.data_utils import get_memorized_dataset, find_token_range
 from third_party.rome.experiments.causal_trace import layername
 from third_party.rome.util.nethook import get_module
+
+
+def get_hidden_state_from_output(model, output, tok_index, output_type):
+    if isinstance(model, XGLMForCausalLM) or isinstance(model, GPT2LMHeadModel):
+        if output_type.startswith("attn") or output_type.startswith("out"):
+            # This output is a tuple.
+            output = output[0]
+        return output[:, tok_index].detach()
+    raise LookupError("Add {} to lookup.".format(type(model)))
 
 
 def set_act_get_hooks(
@@ -58,15 +67,6 @@ def set_act_get_hooks(
     return hooks
 
 
-def get_hidden_state_from_output(model, output, tok_index, output_type):
-    if isinstance(model, XGLMForCausalLM) or isinstance(model, GPT2LMHeadModel):
-        if output_type.startswith("attn") or output_type.startswith("out"):
-            # This output is a tuple.
-            output = output[0]
-        return output[:, tok_index].detach()
-    raise LookupError("Add {} to lookup.".format(type(model)))
-
-
 def remove_hooks(hooks):
     for hook in hooks:
         hook.remove()
@@ -95,6 +95,9 @@ def main(args):
     if args.keep_only_trivial:
         wandb.run.name += " only_trivial"
         data_id += "_only_trivial"
+    if args.last_subject_token:
+        wandb.run.name += " last_subject_token"
+        data_id += "_last_subject_token"
     if args.store_topk:
         wandb.run.name = f"(top{args.store_topk}) {wandb.run.name}"
         args.output_folder = os.path.normpath(args.output_folder)
@@ -129,6 +132,9 @@ def main(args):
         text_input = ex["query_inference"]
         inp = tokenizer(text_input, return_tensors="pt").to(device)
         last_token_index = inp["input_ids"].shape[1] - 1
+        if args.last_subject_token:
+            subj_range = find_token_range(tokenizer, inp["input_ids"], ex["sub_label"])
+            last_token_index = subj_range[1] - 1
         hooks = set_act_get_hooks(
             model,
             total_layers,
@@ -163,6 +169,8 @@ def main(args):
                         "relation": ex["id"].split("_")[1],
                         "layer": layer,
                         "prompt": text_input,
+                        "subject": ex["sub_label"],
+                        "last_token_index": last_token_index,
                         "final_pred": token_pred,
                         "proj_vec": k,
                         "pred_tok_rank": pred_tok_rank,
@@ -176,10 +184,10 @@ def main(args):
     df.to_csv(os.path.join(args.output_folder, f"{filename}.csv"), index=False)
     with open(os.path.join(args.output_folder, "args.json"), "w") as f:
         json.dump(args.__dict__, f, indent=2)
-    df[["proj_vec", "language", "relation", "layer"]].groupby(
+    df[["proj_vec", "language", "relation", "layer", "pred_in_top_1"]].groupby(
         by=["proj_vec", "language", "relation", "layer"], as_index=False
     ).mean().to_csv(
-        os.path.join(args.output_folder, f"{filename}_relation_avg.csv"),
+        os.path.join(args.output_folder, f"{filename}_avg_relation.csv"),
         index=False,
     )
 
@@ -211,6 +219,7 @@ if __name__ == "__main__":
     parser.add_argument("--hook_modules", nargs="+", default=["attn_", "mlp_", "out_"])
     parser.add_argument("--store_topk", type=int)
     parser.add_argument("--output_folder", type=str, required=True)
+    parser.add_argument("--last_subject_token", action="store_true")
     args = parser.parse_args()
 
     if not args.model_name:
