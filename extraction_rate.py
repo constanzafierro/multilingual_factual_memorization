@@ -133,7 +133,9 @@ def main(args):
         inp = tokenizer(text_input, return_tensors="pt").to(device)
         last_token_index = inp["input_ids"].shape[1] - 1
         if args.last_subject_token:
-            subj_range = find_token_range(tokenizer, inp["input_ids"], ex["sub_label"])
+            subj_range = find_token_range(
+                tokenizer, inp["input_ids"], ex["sub_label"], text_input
+            )
             last_token_index = subj_range[1] - 1
         hooks = set_act_get_hooks(
             model,
