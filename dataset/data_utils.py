@@ -48,7 +48,7 @@ def find_token_range(tokenizer, token_ids_array, subject, prompt):
     # If the above failed, we checked the tokens directly as in some languages
     # (e.g. ko) the charachters get paired up differently when in the subject
     # or in the template.
-    max_overlap = 0
+    max_overlap = -1
     overlap_index = -1
     for i in range(len(token_ids_array)):
         if i + len(subj_token_ids) > len(token_ids_array):
@@ -57,19 +57,18 @@ def find_token_range(tokenizer, token_ids_array, subject, prompt):
         if overlap > max_overlap:
             max_overlap = overlap
             overlap_index = i
-
-    remaining_subj = tokenizer.decode(subj_token_ids[max_overlap:])
-    last_subj_token = overlap_index + overlap + 1
-    while last_subj_token <= len(token_ids_array) and remaining_subj.startswith(
-        tokenizer.decode(token_ids_array[overlap_index + max_overlap : last_subj_token])
-    ):
-        last_subj_token += 1
     if overlap_index == -1:
         raise Exception(
             "Failed to find subject={} in the token_ids_array={}".format(
                 subject, token_ids_array
             )
         )
+    remaining_subj = tokenizer.decode(subj_token_ids[max_overlap:])
+    last_subj_token = overlap_index + max_overlap + 1
+    while last_subj_token <= len(token_ids_array) and remaining_subj.startswith(
+        tokenizer.decode(token_ids_array[overlap_index + max_overlap : last_subj_token])
+    ):
+        last_subj_token += 1
     return overlap_index, last_subj_token
 
 
