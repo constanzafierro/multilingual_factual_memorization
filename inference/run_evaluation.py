@@ -60,6 +60,10 @@ def compute_metrics(df):
     df["relation"] = df.apply(lambda ex: ex["id"].split("_")[1], axis=1)
     df["template_id"] = df.apply(lambda ex: ex["id"].split("_")[-1], axis=1)
     df["subj_id"] = df.apply(lambda ex: ex["id"].split("_")[-2], axis=1)
+    if len(df[df.exact_match]) == 0:
+        metrics["memorized_examples"] = 0
+        metrics["memorized_relations"] = 0
+        return
     # Count memorized examples per relation, only one template per subject.
     memorized = (
         df[df.exact_match][["relation", "subj_id", "template_id"]]
