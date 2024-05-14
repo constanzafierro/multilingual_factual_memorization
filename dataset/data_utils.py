@@ -7,7 +7,6 @@ import pandas as pd
 import wandb
 from datasets import load_dataset, concatenate_datasets
 
-from third_party.rome.dsets import KnownsDataset
 from third_party.rome.util.globals import DATA_DIR
 from transformers import (
     LlamaTokenizerFast,
@@ -156,7 +155,7 @@ def log_trivial_examples_counts(memorized_df, ds):
     )
 
 
-def get_memorized_ds(dataset_name, eval_df_filename):
+def _get_memorized_ds(dataset_name, eval_df_filename):
     inference_df = pd.read_json(eval_df_filename)
     memorized_df = inference_df[inference_df.exact_match].copy()
     ds = load_dataset(dataset_name)["train"]
@@ -223,18 +222,6 @@ def get_memorized_dataset(
     resample_trivial=False,
     keep_only_trivial=False,
 ):
-    if dataset_name == "known_facts_rome":
-        knowns = KnownsDataset(DATA_DIR)
-        ds = []
-        for k in knowns:
-            ds.append(
-                {
-                    "sub_label": k["subject"],
-                    "id": k["known_id"],
-                    "query_inference": k["prompt"],
-                }
-            )
-        return ds
     eval_df_filename = os.path.join(
         eval_dir,
         f"{language}--{dataset_name.split('/')[1]}--{model_name}",
@@ -242,7 +229,7 @@ def get_memorized_dataset(
     )
     if wandb.run is not None:
         wandb.config["eval_df_filename"] = eval_df_filename
-    ds = get_memorized_ds(dataset_name, eval_df_filename)
+    ds = _get_memorized_ds(dataset_name, eval_df_filename)
     ds = filter_paraphrases(ds)
     if only_subset and len(ds) > 1000:
         total = max(1000, int(len(ds) * 0.1))
