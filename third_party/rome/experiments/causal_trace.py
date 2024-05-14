@@ -562,20 +562,6 @@ def plot_trace_heatmap(result, savepdf=None, title=None, xlabel=None, modelname=
 
     with plt.rc_context():
         fig, ax = plt.subplots(figsize=(3.5, 2), dpi=200)
-        ticks = np.array(
-            [
-                differences.min().item(),
-                result["low_score"],
-                result["high_score"].item(),
-                differences.max().item(),
-            ]
-        )
-        tick_labels = np.array(
-            [
-                "{:0.3} {}".format(ticks[i], label)
-                for i, label in enumerate(["(Min)", "(Noise)", "(Normal)", "(Max)"])
-            ]
-        )
         h = ax.pcolor(
             differences,
             cmap={None: "Purples", "None": "Purples", "mlp": "Greens", "attn": "Reds"}[
@@ -598,8 +584,6 @@ def plot_trace_heatmap(result, savepdf=None, title=None, xlabel=None, modelname=
             ax.set_title(f"Impact of restoring {kindname} after corrupted input")
             ax.set_xlabel(f"center of interval of {window} restored {kindname} layers")
         cb = plt.colorbar(h)
-        cb.set_ticks(ticks[np.argsort(ticks)])
-        cb.set_ticklabels(tick_labels[np.argsort(ticks)])
         if title is not None:
             ax.set_title(title)
         if xlabel is not None:
