@@ -7,6 +7,7 @@ from datasets import load_dataset
 from inference.f1_score import compute_score
 
 from dataset.pararel_utils import OBJECT_KEY
+from dataset.data_utils import log_trivial_examples_counts
 
 
 def evaluate(dataset, id_to_prediction, langs):
@@ -76,7 +77,6 @@ def compute_metrics(df):
         .count()
         .values
     )
-    metrics["memorized_examples"] = len(memorized)
     metrics["memorized_relations"] = len(relation_count)
     metrics["total_relations"] = len(df.relation.unique())
     for relation, count in relation_count:
@@ -99,6 +99,7 @@ def main(args):
     df.to_json(
         os.path.join(experiment_dir, "eval_per_example_records.json"), orient="records"
     )
+    log_trivial_examples_counts(df, dataset)
     wandb.log(compute_metrics(df))
 
 
