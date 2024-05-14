@@ -4,10 +4,10 @@ from functools import partial
 
 import numpy as np
 import pandas as pd
+from tqdm import tqdm
 import wandb
-from datasets import load_dataset, concatenate_datasets
+from datasets import load_dataset, concatenate_datasets, load_from_disk
 
-from third_party.rome.util.globals import DATA_DIR
 from transformers import (
     LlamaTokenizerFast,
     GPT2TokenizerFast,
@@ -272,3 +272,46 @@ def get_memorized_dataset(
             ds.filter(lambda ex: is_trivial_example(ex["obj_label"], ex["query"]))
         )
     return ds
+
+
+def get_xlingual_memorized(eval_dir, model_name, is_mlm, cache_folder=None):
+    def get_ds_name(lang):
+        if not is_mlm and lang in ["fa", "tr", "ko", "ja"]:
+            return "coastalcph/mpararel_autorr"
+        return "coastalcph/xlingual_mpararel_autorr"
+
+    if cache_folder and os.path.exists(os.path.join(cache_folder, model_name)):
+        return load_from_disk(os.path.join(cache_folder, model_name))
+
+    languages = ["en", "es", "vi", "tr", "ru", "uk", "ja", "ko", "he", "fa", "ar"]
+    datasets = []
+    for lang in tqdm(languages):
+        datasets.append(
+            get_memorized_dataset(
+                get_ds_name(lang),
+                lang,
+                eval_dir,
+                model_name,
+                only_subset=False,
+                filter_trivial=True,
+            )
+        )
+    ds = concatenate_datasets(datasets)
+    df = pd.DataFrame(ds)
+    xlingual = (
+        df[["language", "relation", "sub_uri", "obj_uri"]]
+        .drop_duplicates()
+        .groupby(by=["relation", "sub_uri", "obj_uri"], as_index=False)
+        .count()
+    )
+    xlingual = xlingual[xlingual["language"] > 1]
+    xlingual = set(
+        ["_".join(uris) for uris in xlingual[["relation", "sub_uri", "obj_uri"]].values]
+    )
+    ds_xlingual = ds.filter(
+        lambda ex: "_".join([ex["relation"], ex["sub_uri"], ex["obj_uri"]]) in xlingual
+    )
+    if cache_folder:
+        os.makedirs(os.path.join(cache_folder, model_name))
+        ds_xlingual.save_to_disk(os.path.join(cache_folder, model_name))
+    return ds_xlingual
