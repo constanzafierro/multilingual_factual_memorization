@@ -9,7 +9,12 @@ import torch
 from datasets import load_dataset
 from matplotlib import pyplot as plt
 from tqdm import tqdm
-from transformers import AutoModelForCausalLM, AutoTokenizer, XGLMForCausalLM
+from transformers import (
+    AutoModelForCausalLM,
+    AutoTokenizer,
+    XGLMForCausalLM,
+    MT5ForConditionalGeneration,
+)
 
 from dsets import KnownsDataset
 from rome.tok_dataset import (
@@ -509,8 +514,21 @@ def layername(model, num=-1, kind=None):
         }
         if kind in kind_to_layer:
             return kind_to_layer[kind]
+        # self_attn: after later_norm, before dropout and residual.
+        # fc1: before dropout and residual.
         kind_map = {"attn": "self_attn", "mlp": "fc2"}
         return f'model.layers.{num}{"" if kind is None else "." + kind_map[kind]}'
+    if isinstance(model, MT5ForConditionalGeneration):
+        kind_to_layer = {
+            "embed": "shared",
+            "lm_head": "lm_head",
+        }
+        if kind in kind_to_layer:
+            return kind_to_layer[kind]
+        kind_map = {"attn": "0.SelfAttention", "mlp": "1.DenseReluDense"}
+        return (
+            f'encoder.block.{num}.layer{"" if kind is None else "." + kind_map[kind]}'
+        )
     assert False, "unknown transformer structure"
 
 
