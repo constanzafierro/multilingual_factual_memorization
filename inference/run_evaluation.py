@@ -109,7 +109,7 @@ def main(args):
 
     dataset = load_dataset(args.dataset_name)["train"]
     if args.use_sentinel_prediction:
-        ids_to_prediction = load_sentinel_prediction(args.predictions_path)
+        id_to_prediction = load_sentinel_prediction(args.predictions_path)
         wandb.run.name += " sentinel_prediction"
     else:
         id_to_prediction = load_predictions(args.predictions_path)
