@@ -5,7 +5,7 @@ import json
 import wandb
 from datasets import load_dataset
 from inference.f1_score import compute_score
-
+import re
 from dataset.pararel_utils import OBJECT_KEY
 from dataset.data_utils import log_trivial_examples_counts
 
@@ -23,7 +23,7 @@ def evaluate(dataset, id_to_prediction, langs):
         targets = targets if isinstance(targets, list) else [targets]
         prediction = id_to_prediction[query_id]
 
-        if not len(prediction["answer"]):
+        if not len(prediction):
             num_empty += 1
             continue
 
@@ -33,7 +33,7 @@ def evaluate(dataset, id_to_prediction, langs):
                 "id": query_id,
             }
         )
-        qa_predictions.append({"prediction_text": prediction["answer"], "id": query_id})
+        qa_predictions.append({"prediction_text": prediction, "id": query_id})
 
     print("Evaluating on {} datapoints".format(len(qa_targets)))
     print("Num empty", num_empty)
@@ -46,13 +46,26 @@ def load_predictions(data_path):
     with open(os.path.join(data_path, "predictions.json")) as fhandle:
         for line in fhandle:
             data = json.loads(line)
-            example_id = data["example_id"]
-            data.pop("example_id")
             # We assume there is only one prediction.
-            data.update(data["predictions"][0])
-            data.pop("predictions")
-            id_to_preds[example_id] = data
+            id_to_preds[data["example_id"]] = data["predictions"][0]["answer"]
     return id_to_preds
+
+
+def load_sentinel_prediction(data_path, tokenizer):
+    id_to_preds = {}
+    with open(os.path.join(data_path, "raw_predictions.json")) as fhandle:
+        for line in fhandle:
+            data = json.loads(line)
+            answer = data["predictions"][0]["answer"]
+            answer = answer.replace("<pad>", "").replace("</s>", "").strip()
+            if not re.match(r"(<extra_id_\d>.*)+", answer):
+                raise Exception(
+                    "'{}' did not match the regex with sentinel tokens.".format(answer)
+                )
+            re_split = re.split(r"<extra_id_(\d)>", answer)
+            sentinel_index, pred = re_split[1], re_split[2]
+            assert sentinel_index == "0", answer
+            id_to_preds[data["example_id"]] = pred
 
 
 def compute_metrics(df):
@@ -88,12 +101,18 @@ def main(args):
     experiment_dir = os.path.join(
         args.output_dir, os.path.basename(args.predictions_path)
     )
+    if args.use_sentinel_prediction:
+        experiment_dir = os.path.join(experiment_dir, "sentinel_pred")
     if not os.path.exists(experiment_dir):
         os.makedirs(experiment_dir)
     wandb.config["final_dir"] = experiment_dir
 
     dataset = load_dataset(args.dataset_name)["train"]
-    id_to_prediction = load_predictions(args.predictions_path)
+    if args.use_sentinel_prediction:
+        ids_to_prediction = load_sentinel_prediction(args.predictions_path)
+        wandb.run.name += " sentinel_prediction"
+    else:
+        id_to_prediction = load_predictions(args.predictions_path)
     df, scores = evaluate(dataset, id_to_prediction, langs=args.langs)
     wandb.log({k: v for k, v in scores.items() if not isinstance(v, list)})
     df.to_json(
@@ -119,6 +138,7 @@ if __name__ == "__main__":
         help="Dir where model outputs will be stored",
     )
     parser.add_argument("--langs", default=[], nargs="+", help="Experiment name")
+    parser.add_argument("--use_sentinel_prediction", action="store_true")
     args = parser.parse_args()
 
     wandb.init(
