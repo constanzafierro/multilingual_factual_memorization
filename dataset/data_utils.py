@@ -114,7 +114,10 @@ def add_exact_query(example, memorized_df, df_id_to_index):
             # prepare_prompt will be called before this is fed into the model.
             if "pred_with_special_tokens" in memorized_df.columns:
                 example["query_inference"] = example["query"]
-                example["decoder_prefix"] = row["prediction"][:start_index]
+                example["decoder_prefix"] = row["pred_with_special_tokens"][
+                    :start_index
+                ]
+                example["prediction"] = row["pred_with_special_tokens"]
             else:
                 example["query_inference"] = (
                     example["query"].strip()
@@ -122,6 +125,7 @@ def add_exact_query(example, memorized_df, df_id_to_index):
                     + row["prediction"][:start_index].strip()
                 )
                 example["decoder_prefix"] = None
+                example["prediction"] = row["prediction"]
         except Exception as e:
             print("example in ds", example["query"])
             print("row", row)
@@ -130,6 +134,8 @@ def add_exact_query(example, memorized_df, df_id_to_index):
             raise (e)
     else:
         example["query_inference"] = example["query"]
+        example["decoder_prefix"] = None
+        example["prediction"] = row["prediction"]
     return example
 
 
