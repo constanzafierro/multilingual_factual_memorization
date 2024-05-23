@@ -66,6 +66,7 @@ def load_sentinel_prediction(data_path):
             sentinel_index, pred = re_split[1], re_split[2]
             assert sentinel_index == "0", answer
             id_to_preds[data["example_id"]] = pred
+    return id_to_preds
 
 
 def compute_metrics(df):
