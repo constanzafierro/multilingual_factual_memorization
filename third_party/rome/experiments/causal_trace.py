@@ -490,7 +490,7 @@ class ModelAndTokenizer:
         )
 
 
-def layername(model, num=-1, kind=None):
+def layername(model, stack="encoder", num=-1, kind=None):
     if hasattr(model, "transformer"):
         kind_to_layer = {
             "embed": "transformer.wte",
@@ -527,7 +527,7 @@ def layername(model, num=-1, kind=None):
             return kind_to_layer[kind]
         kind_map = {"attn": "0.SelfAttention", "mlp": "1.DenseReluDense"}
         return (
-            f'encoder.block.{num}.layer{"" if kind is None else "." + kind_map[kind]}'
+            f'{stack}.block.{num}.layer{"" if kind is None else "." + kind_map[kind]}'
         )
     assert False, "unknown transformer structure"
 

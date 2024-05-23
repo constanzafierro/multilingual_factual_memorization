@@ -86,7 +86,7 @@ def remove_punc(text):
     return "".join(ch for ch in text if ch not in exclude)
 
 
-def get_start_ans(pred, gt_list):
+def get_start_ans(pred, gt_list, ignore_from_punctuation=0):
     start_idx = None
     pred = pred.lower()
     for gt in gt_list:
@@ -95,7 +95,13 @@ def get_start_ans(pred, gt_list):
             start_idx = id_found
     gt_without_punc = [remove_punc(gt) for gt in gt_list]
     if start_idx is None and gt_list != gt_without_punc:
-        return get_start_ans(remove_punc(pred), gt_without_punc)
+        return get_start_ans(
+            "{}{}".format(
+                pred[:ignore_from_punctuation],
+                remove_punc(pred[ignore_from_punctuation:]),
+            ),
+            gt_without_punc,
+        )
     return start_idx
 
 
@@ -104,9 +110,18 @@ def add_exact_query(example, memorized_df, df_id_to_index):
     start_index = int(row["start_answer"].item())
     if start_index != 0:
         try:
-            example["query_inference"] = (
-                example["query"].strip() + " " + row["prediction"][:start_index].strip()
-            )
+            # Note that this query_inference is assuming that the
+            # prepare_prompt will be called before this is fed into the model.
+            if "pred_with_special_tokens" in memorized_df.columns:
+                example["query_inference"] = example["query"]
+                example["decoder_prefix"] = row["prediction"][:start_index]
+            else:
+                example["query_inference"] = (
+                    example["query"].strip()
+                    + " "
+                    + row["prediction"][:start_index].strip()
+                )
+                example["decoder_prefix"] = None
         except Exception as e:
             print("example in ds", example["query"])
             print("row", row)
@@ -168,9 +183,19 @@ def _get_memorized_ds(dataset_name, eval_df_filename):
         log_trivial_examples_counts(memorized_df, ds)
 
     # Add 'query_inference' with all the tokens before the object.
-    memorized_df["start_answer"] = memorized_df.apply(
-        lambda ex: get_start_ans(ex["prediction"], ex["ground_truth"]), axis=1
-    )
+    if "pred_with_special_tokens" in memorized_df.columns:
+        memorized_df["start_answer"] = memorized_df.apply(
+            lambda ex: get_start_ans(
+                ex["pred_with_special_tokens"],
+                ex["ground_truth"],
+                ignore_from_punctuation=len("<pad> <extra_id_0>"),
+            ),
+            axis=1,
+        )
+    else:
+        memorized_df["start_answer"] = memorized_df.apply(
+            lambda ex: get_start_ans(ex["prediction"], ex["ground_truth"]), axis=1
+        )
     if len(memorized_df[memorized_df.start_answer.isnull()]) > 0:
         none_values = memorized_df[memorized_df.start_answer.isnull()]
         print(

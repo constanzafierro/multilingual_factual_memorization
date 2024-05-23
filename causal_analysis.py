@@ -1,7 +1,6 @@
 import argparse
 import collections
 import os
-import string
 from collections import defaultdict
 
 import matplotlib.pyplot as plt
@@ -11,11 +10,11 @@ import torch
 import wandb
 from tqdm import tqdm
 from dataset.data_utils import get_memorized_dataset, find_token_range
+from inference.run_inference import prepare_prompt
 from third_party.rome.experiments.causal_trace import (
     collect_embedding_std,
     decode_tokens,
     layername,
-    make_inputs,
     plot_trace_heatmap,
     predict_from_input,
     predict_token,
@@ -87,14 +86,29 @@ def trace_with_patch(
 
 
 def calculate_hidden_flow(
-    mt, prompt, subject, samples=10, noise=0.1, window=10, kind=None
+    mt,
+    prompt,
+    subject,
+    decoder_prompt=None,
+    noise=0.1,
+    window=10,
+    kind=None,
 ):
     """
     Copy of the function in causal_trace.ipynb
     Runs causal tracing over every token/layer combination in the network
     and returns a dictionary numerically summarizing the results.
     """
-    inp = make_inputs(mt.tokenizer, [prompt] * (samples + 1))
+    device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
+    prompt = prepare_prompt(
+        prompt, args.model_name_or_path, args.instruction, args.is_mlm_template
+    )
+    inp = mt.tokenizer(prompt, return_tensors="pt").to(device)
+    if decoder_prompt:
+        decoder_input_ids = mt.tokenizer(
+            decoder_prompt, return_tensors="pt", add_special_tokens=False
+        ).input_ids.to(device)
+        inp = {**inp, "decoder_input_ids": decoder_input_ids}
     with torch.no_grad():
         answer_t, base_score = [d[0] for d in predict_from_input(mt.model, inp)]
     [answer] = decode_tokens(mt.tokenizer, [answer_t])
@@ -119,12 +133,20 @@ def calculate_hidden_flow(
             kind=kind,
         )
     differences = differences.detach().cpu()
+    input_ids = inp["input_ids"][0]
+    if decoder_prompt:
+        input_ids = np.concatenate(
+            (
+                inp["input_ids"][0].detach().cpu().numpy(),
+                inp["decoder_input_ids"][0].detach().cpu().numpy(),
+            )
+        )
     return dict(
         scores=differences,
         low_score=low_score,
         high_score=base_score,
-        input_ids=inp["input_ids"][0],
-        input_tokens=decode_tokens(mt.tokenizer, inp["input_ids"][0]),
+        input_ids=input_ids,
+        input_tokens=decode_tokens(mt.tokenizer, input_ids),
         subject_range=e_range,
         answer=answer,
         window=window,
@@ -134,21 +156,24 @@ def calculate_hidden_flow(
 
 def trace_important_states(model, num_layers, inp, e_range, answer_t, noise=0.1):
     """Copy of the function in causal_trace.ipynb"""
-    ntoks = inp["input_ids"].shape[1]
     table = []
-    for tnum in range(ntoks):
-        row = []
-        for layer in range(0, num_layers):
-            r = trace_with_patch(
-                model,
-                inp,
-                [(tnum, layername(model, layer))],
-                answer_t,
-                tokens_to_mix=e_range,
-                noise=noise,
-            )
-            row.append(r)
-        table.append(torch.stack(row))
+    for ids_key, stack in [("input_ids", "encoder"), ("decoder_input_ids", "decoder")]:
+        if ids_key not in inp:
+            continue
+        ntoks = inp[ids_key].shape[1]
+        for tnum in range(ntoks):
+            row = []
+            for layer in range(0, num_layers):
+                r = trace_with_patch(
+                    model,
+                    inp,
+                    [(tnum, layername(model, stack=stack, num=layer))],
+                    answer_t,
+                    tokens_to_mix=e_range,
+                    noise=noise,
+                )
+                row.append(r)
+            table.append(torch.stack(row))
     return torch.stack(table)
 
 
@@ -156,22 +181,26 @@ def trace_important_window(
     model, num_layers, inp, e_range, answer_t, kind, window=10, noise=0.1
 ):
     """Copy of the function in causal_trace.ipynb"""
-    ntoks = inp["input_ids"].shape[1]
     table = []
-    for tnum in range(ntoks):
-        row = []
-        for layer in range(0, num_layers):
-            layerlist = [
-                (tnum, layername(model, L, kind))
-                for L in range(
-                    max(0, layer - window // 2), min(num_layers, layer - (-window // 2))
+    for ids_key, stack in [("input_ids", "encoder"), ("decoder_input_ids", "decoder")]:
+        if ids_key not in inp:
+            continue
+        ntoks = inp[ids_key].shape[1]
+        for tnum in range(ntoks):
+            row = []
+            for layer in range(0, num_layers):
+                layerlist = [
+                    (tnum, layername(model, stack=stack, num=L, kind=kind))
+                    for L in range(
+                        max(0, layer - window // 2),
+                        min(num_layers, layer - (-window // 2)),
+                    )
+                ]
+                r = trace_with_patch(
+                    model, inp, layerlist, answer_t, tokens_to_mix=e_range, noise=noise
                 )
-            ]
-            r = trace_with_patch(
-                model, inp, layerlist, answer_t, tokens_to_mix=e_range, noise=noise
-            )
-            row.append(r)
-        table.append(torch.stack(row))
+                row.append(r)
+            table.append(torch.stack(row))
     return torch.stack(table)
 
 
@@ -419,6 +448,7 @@ def plot_hidden_flow(
                 mt,
                 ex["query_inference"],
                 ex["sub_label"],
+                ex["decoder_prefix"],
                 noise=noise_level,
                 kind=kind,
             )

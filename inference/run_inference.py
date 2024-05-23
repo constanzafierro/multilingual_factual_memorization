@@ -30,7 +30,7 @@ def prepare_prompt(query, model_name_or_path, instruction, is_mlm_template):
     if "mt5" in model_name_or_path:
         if is_mlm_template:
             return query.replace("[Y]", "<extra_id_0>")
-        return query + " <extra_id_0> "
+        return query + " <extra_id_0>"
     # Assume autorregressive template and model.
     return query
 
@@ -170,7 +170,7 @@ def inference(dataset, tokenizer, model, args, experiment_dir):
         outputs["raw_predictions"].append(
             {
                 "example_id": example_id,
-                "query": query,
+                "prompt": prompt,
                 "predictions": [
                     {
                         "output_ids": model_output["sequences"][0].cpu().tolist(),
@@ -182,7 +182,7 @@ def inference(dataset, tokenizer, model, args, experiment_dir):
         outputs["predictions"].append(
             {
                 "example_id": example_id,
-                "query": query,
+                "prompt": prompt,
                 "predictions": [
                     {
                         "answer": answer,
