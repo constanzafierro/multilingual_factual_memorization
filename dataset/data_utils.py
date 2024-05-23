@@ -247,11 +247,15 @@ def get_memorized_dataset(
     resample_trivial=False,
     keep_only_trivial=False,
 ):
-    eval_df_filename = os.path.join(
+    eval_df_folder = os.path.join(
         eval_dir,
         f"{language}--{dataset_name.split('/')[1]}--{model_name}",
-        "eval_per_example_records.json",
     )
+    eval_df_filename = os.path.join(eval_df_folder, "eval_per_example_records.json")
+    if os.path.exists(os.path.join(eval_df_folder, "sentinel_pred")):
+        eval_df_filename = os.path.join(
+            eval_df_folder, "sentinel_pred", "eval_per_example_records.json"
+        )
     if wandb.run is not None:
         wandb.config["eval_df_filename"] = eval_df_filename
     ds = _get_memorized_ds(dataset_name, eval_df_filename)
