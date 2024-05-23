@@ -51,7 +51,7 @@ def load_predictions(data_path):
     return id_to_preds
 
 
-def load_sentinel_prediction(data_path, tokenizer):
+def load_sentinel_prediction(data_path):
     id_to_preds = {}
     with open(os.path.join(data_path, "raw_predictions.json")) as fhandle:
         for line in fhandle:
