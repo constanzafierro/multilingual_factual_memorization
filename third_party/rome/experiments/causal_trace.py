@@ -509,7 +509,7 @@ def layername(model, num=-1, kind=None, stack="encoder"):
         return f'gpt_neox.layers.{num}{"" if kind is None else "." + kind}'
     if isinstance(model, XGLMForCausalLM):
         kind_to_layer = {
-            "embed": "shared",
+            "embed": "model.embed_tokens",
             "layers": "model.layers",
             "lm_head": "lm_head",
         }
@@ -521,7 +521,7 @@ def layername(model, num=-1, kind=None, stack="encoder"):
         return f'model.layers.{num}{"" if kind is None else "." + kind_map[kind]}'
     if isinstance(model, MT5ForConditionalGeneration):
         kind_to_layer = {
-            "embed": "encoder.embed_tokens",
+            "embed": "shared",
             "lm_head": "lm_head",
         }
         if kind in kind_to_layer:
