@@ -475,6 +475,7 @@ class ModelAndTokenizer:
         self.model_name = model_name
         self.tokenizer = tokenizer
         self.model = model
+        # TODO: fix
         self.layer_names = [
             n
             for n, m in model.named_modules()
@@ -508,7 +509,7 @@ def layername(model, num=-1, kind=None, stack="encoder"):
         return f'gpt_neox.layers.{num}{"" if kind is None else "." + kind}'
     if isinstance(model, XGLMForCausalLM):
         kind_to_layer = {
-            "embed": "model.embed_tokens",
+            "embed": "shared",
             "layers": "model.layers",
             "lm_head": "lm_head",
         }

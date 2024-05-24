@@ -40,13 +40,17 @@ def trace_with_patch(
     for t, l in states_to_patch:
         patch_spec[l].append(t)
     embed_layername = layername(model, 0, "embed")
+    if "decoder_input_ids" in inp:
+        encoder_input_shape = inp["input_ids"].shape[-1]
 
     def untuple(x):
         return x[0] if isinstance(x, tuple) else x
 
     # Define the model-patching rule.
     def patch_rep(x, layer):
-        if layer == embed_layername:
+        if layer == embed_layername and (
+            "decoder_input_ids" not in inp or x.shape[1] == encoder_input_shape
+        ):
             # If requested, we corrupt a range of token embeddings on batch items x[1:]
             if tokens_to_mix is not None:
                 b, e = tokens_to_mix
