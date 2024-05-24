@@ -2,25 +2,37 @@ from accelerate import Accelerator
 from transformers import (
     AutoModelForCausalLM,
     AutoTokenizer,
+    AutoModelForSeq2SeqLM,
     LlamaForCausalLM,
 )
 import torch
 from third_party.rome.experiments.causal_trace import ModelAndTokenizer
 
 
-def load_model_and_tok(args):
+def load_model_and_tok(model_name_or_path, model_name):
     device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
-    model = ""
-    model = AutoModelForCausalLM.from_pretrained(args.model_name_or_path).to(device)
+    if "t5" in model_name_or_path:
+        model = AutoModelForSeq2SeqLM.from_pretrained(
+            model_name_or_path,
+            load_in_8bit="xxl" in model_name_or_path,
+            device_map="auto",
+        )
+    elif "polylm" in model_name_or_path:
+        model = AutoModelForCausalLM.from_pretrained(
+            model_name_or_path,
+            trust_remote_code=True,
+            device_map="auto",
+            load_in_8bit="13b" in model_name_or_path,
+        )
+    else:
+        model = AutoModelForCausalLM.from_pretrained(model_name_or_path).to(device)
     accelerator = Accelerator()
     model = accelerator.prepare(model)
     tokenizer = AutoTokenizer.from_pretrained(
-        args.model_name_or_path,
+        model_name_or_path,
         use_fast=not isinstance(model, LlamaForCausalLM),
     )
-    return ModelAndTokenizer(
-        model_name=args.model_name, model=model, tokenizer=tokenizer
-    )
+    return ModelAndTokenizer(model_name=model_name, model=model, tokenizer=tokenizer)
 
 
 def load_tokenizer(model_name_or_path):

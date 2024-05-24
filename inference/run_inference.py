@@ -8,8 +8,6 @@ import wandb
 from datasets import load_dataset
 from tqdm import tqdm
 from transformers import (
-    AutoModelForCausalLM,
-    AutoModelForSeq2SeqLM,
     BloomTokenizerFast,
     GenerationConfig,
     GPT2TokenizerFast,
@@ -20,7 +18,7 @@ from transformers import (
     XGLMTokenizerFast,
 )
 
-from model_utils import load_tokenizer
+from model_utils import load_model_and_tok
 
 device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
 NUM_BEAMS = 1
@@ -200,31 +198,15 @@ def inference(dataset, tokenizer, model, args, experiment_dir):
 
 
 def main(args):
-    experiment_name = "{}--{}".format(
-        args.exp_name, args.model_name_or_path.replace("/", "__")
-    )
+    args.model_name = args.model_name_or_path.replace("/", "__")
+    experiment_name = "{}--{}".format(args.exp_name, args.model_name)
     experiment_dir = os.path.join(args.output_dir, experiment_name)
     os.makedirs(experiment_dir, exist_ok=True)
     wandb.config["final_dir"] = experiment_dir
 
     print("Loading model")
-    tokenizer = load_tokenizer(args.model_name_or_path)
-
-    if "t5" in args.model_name_or_path:
-        model = AutoModelForSeq2SeqLM.from_pretrained(
-            args.model_name_or_path,
-            load_in_8bit="xxl" in args.model_name_or_path,
-            device_map="auto",
-        )
-    elif "polylm" in args.model_name_or_path:
-        model = AutoModelForCausalLM.from_pretrained(
-            args.model_name_or_path,
-            trust_remote_code=True,
-            device_map="auto",
-            load_in_8bit="13b" in args.model_name_or_path,
-        )
-    else:
-        model = AutoModelForCausalLM.from_pretrained(args.model_name_or_path).to(device)
+    mt = load_model_and_tok(args.model_name_or_path, args.model_name)
+    model, tokenizer = mt.model, mt.tokenizer
     model.eval()
 
     print("Loading dataset")

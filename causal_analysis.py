@@ -508,7 +508,7 @@ def main(args):
     os.makedirs(cache_hidden_flow, exist_ok=True)
     os.makedirs(pdf_output_dir, exist_ok=True)
 
-    mt = load_model_and_tok(args)
+    mt = load_model_and_tok(args.model_name_or_path, args.model_name)
     if not args.only_plot_average:
         print("Testing prediction...")
         print(
