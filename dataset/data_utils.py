@@ -1,19 +1,19 @@
 import os
 import string
 from functools import partial
+from glob import glob
 
 import numpy as np
 import pandas as pd
-from tqdm import tqdm
 import wandb
-from datasets import load_dataset, concatenate_datasets, load_from_disk
-
+from datasets import concatenate_datasets, load_dataset, load_from_disk
+from tqdm import tqdm
 from transformers import (
-    LlamaTokenizerFast,
     GPT2TokenizerFast,
-    T5TokenizerFast,
-    LlamaTokenizer,
     GPTNeoXTokenizerFast,
+    LlamaTokenizer,
+    LlamaTokenizerFast,
+    T5TokenizerFast,
     XGLMTokenizerFast,
 )
 
@@ -253,10 +253,14 @@ def get_memorized_dataset(
     resample_trivial=False,
     keep_only_trivial=False,
 ):
-    eval_df_folder = os.path.join(
-        eval_dir,
-        f"{language}--{dataset_name.split('/')[1]}--{model_name}",
+    eval_df_folder = glob(
+        os.path.join(
+            eval_dir,
+            f"{language}*{dataset_name.split('/')[1]}--{model_name}",
+        )
     )
+    assert len(eval_df_folder) == 1, eval_df_folder
+    eval_df_folder = eval_df_folder[0]
     eval_df_filename = os.path.join(eval_df_folder, "eval_per_example_records.json")
     if os.path.exists(os.path.join(eval_df_folder, "sentinel_pred")):
         eval_df_filename = os.path.join(
