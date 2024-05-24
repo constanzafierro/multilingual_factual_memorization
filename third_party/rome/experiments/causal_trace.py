@@ -703,7 +703,7 @@ def collect_embedding_std(mt, subjects, seq2seq=False, subjects_from_ds=None):
             # only using the embeds output.
             inp = {
                 **inp,
-                "decoder_input_ids": torch.tensor([mt.tokenizer.pad_token_id]).to(
+                "decoder_input_ids": torch.tensor([[mt.tokenizer.pad_token_id]]).to(
                     mt.model.device
                 ),
             }
