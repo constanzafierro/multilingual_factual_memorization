@@ -100,9 +100,7 @@ def calculate_hidden_flow(
     and returns a dictionary numerically summarizing the results.
     """
     device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
-    prompt = prepare_prompt(
-        prompt, args.model_name_or_path, args.instruction, args.is_mlm_template
-    )
+    prompt = prepare_prompt(prompt, args.model_name_or_path, "", "t5" in mt.model_name)
     inp = mt.tokenizer(prompt, return_tensors="pt").to(device)
     if decoder_prompt:
         decoder_input_ids = mt.tokenizer(
