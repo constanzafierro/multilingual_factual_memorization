@@ -662,8 +662,15 @@ def find_token_range(tokenizer, token_array, substring):
     return (tok_start, tok_end)
 
 
-def predict_token(mt, prompts, return_p=False):
+def predict_token(mt, prompts, decoder_prompt=None, return_p=False):
     inp = make_inputs(mt.tokenizer, prompts, device=mt.model.device)
+    if decoder_prompt:
+        inp = {
+            **inp,
+            "decoder_input_ids": mt.tokenizer(
+                decoder_prompt, return_tensors="pt", add_special_tokens=False
+            ).input_ids.to(mt.model.device),
+        }
     preds, p = predict_from_input(mt.model, inp)
     result = [mt.tokenizer.decode(c) for c in preds]
     if return_p:
@@ -678,7 +685,7 @@ def predict_from_input(model, inp):
     return preds, p
 
 
-def collect_embedding_std(mt, subjects, subjects_from_ds=None):
+def collect_embedding_std(mt, subjects, seq2seq=False, subjects_from_ds=None):
     cache_filename = None
     if mt.model_name and subjects_from_ds:
         cache_filename = os.path.join(
@@ -691,6 +698,13 @@ def collect_embedding_std(mt, subjects, subjects_from_ds=None):
     alldata = []
     for s in subjects:
         inp = make_inputs(mt.tokenizer, [s])
+        if seq2seq:
+            # It doesn't matter what we feed into decoder_input_ids as we are
+            # only using the embeds output.
+            inp = {
+                **inp,
+                "decoder_input_ids": torch.tensor([mt.tokenizer.pad_token_id]),
+            }
         with nethook.Trace(mt.model, layername(mt.model, 0, "embed")) as t:
             mt.model(**inp)
             alldata.append(t.output[0])

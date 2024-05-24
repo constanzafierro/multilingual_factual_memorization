@@ -518,6 +518,9 @@ def main(args):
                     "Megan Rapinoe plays the sport of",
                     "The Space Needle is in the city of",
                 ],
+                decoder_prompt=(
+                    "<pad> <extra_id_0>" if "t5" in args.model_name else None
+                ),
                 return_p=True,
             )
         )
@@ -542,6 +545,7 @@ def main(args):
         noise_level = 3 * collect_embedding_std(
             mt,
             [ex["sub_label"] for ex in ds],
+            seq2seq="t5" in args.model_name,
             subjects_from_ds=data_id,
         )
     wandb.run.summary["noise_level"] = noise_level
