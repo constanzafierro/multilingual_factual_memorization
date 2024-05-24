@@ -519,7 +519,7 @@ def main(args):
                     "The Space Needle is in the city of",
                 ],
                 decoder_prompt=(
-                    "<pad> <extra_id_0>" if "t5" in args.model_name else None
+                    ["<pad> <extra_id_0>"] * 2 if "t5" in args.model_name else None
                 ),
                 return_p=True,
             )
