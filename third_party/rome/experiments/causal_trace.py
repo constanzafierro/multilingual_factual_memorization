@@ -461,6 +461,7 @@ class ModelAndTokenizer:
         tokenizer=None,
         low_cpu_mem_usage=False,
         torch_dtype=None,
+        num_layers=None,
     ):
         if tokenizer is None:
             assert model_name is not None
@@ -475,13 +476,15 @@ class ModelAndTokenizer:
         self.model_name = model_name
         self.tokenizer = tokenizer
         self.model = model
-        # TODO: fix
-        self.layer_names = [
-            n
-            for n, m in model.named_modules()
-            if (re.match(r"^(transformer|gpt_neox|model)\.(h|layers)\.\d+$", n))
-        ]
-        self.num_layers = len(self.layer_names)
+        self.num_layers = num_layers
+        if not num_layers:
+            self.layer_names = [
+                n
+                for n, m in model.named_modules()
+                if (re.match(r"^(transformer|gpt_neox|model)\.(h|layers)\.\d+$", n))
+            ]
+            self.num_layers = len(self.layer_names)
+            assert self.num_layers > 0, model.named_modules()
 
     def __repr__(self):
         return (

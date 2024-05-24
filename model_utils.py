@@ -4,6 +4,7 @@ from transformers import (
     AutoTokenizer,
     AutoModelForSeq2SeqLM,
     LlamaForCausalLM,
+    AutoConfig,
 )
 import torch
 from third_party.rome.experiments.causal_trace import ModelAndTokenizer
@@ -28,11 +29,17 @@ def load_model_and_tok(model_name_or_path, model_name):
         model = AutoModelForCausalLM.from_pretrained(model_name_or_path).to(device)
     accelerator = Accelerator()
     model = accelerator.prepare(model)
+    config = AutoConfig.from_pretrained(model_name_or_path)
     tokenizer = AutoTokenizer.from_pretrained(
         model_name_or_path,
         use_fast=not isinstance(model, LlamaForCausalLM),
     )
-    return ModelAndTokenizer(model_name=model_name, model=model, tokenizer=tokenizer)
+    return ModelAndTokenizer(
+        model_name=model_name,
+        model=model,
+        tokenizer=tokenizer,
+        num_layers=config.num_layers,
+    )
 
 
 def load_tokenizer(model_name_or_path):
