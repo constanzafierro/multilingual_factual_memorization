@@ -490,7 +490,7 @@ class ModelAndTokenizer:
         )
 
 
-def layername(model, stack="encoder", num=-1, kind=None):
+def layername(model, num=-1, kind=None, stack="encoder"):
     if hasattr(model, "transformer"):
         kind_to_layer = {
             "embed": "transformer.wte",
