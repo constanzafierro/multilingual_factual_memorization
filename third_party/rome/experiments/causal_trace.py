@@ -529,7 +529,10 @@ def layername(model, num=-1, kind=None, stack="encoder"):
         }
         if kind in kind_to_layer:
             return kind_to_layer[kind]
-        kind_map = {"attn": "0.SelfAttention", "mlp": "1.DenseReluDense"}
+        kind_map = {
+            "attn": "0.SelfAttention",
+            "mlp": "1.DenseReluDense" if stack == "encoder" else "2.DenseReluDense",
+        }
         return (
             f'{stack}.block.{num}.layer{"" if kind is None else "." + kind_map[kind]}'
         )
