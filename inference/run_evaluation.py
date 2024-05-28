@@ -69,7 +69,7 @@ def load_sentinel_prediction(data_path, raw_pred=False):
             if raw_pred:
                 answer = data["predictions"][0]["answer"]
                 id_to_preds[data["example_id"]] = re.match(
-                    r"(<pad> <extra_id_0>.*?)(?=<extra_id_\d>|</s>)", answer
+                    r"(<pad> <extra_id_0>.*?)(?=<extra_id_\d>|</s>|$)", answer
                 ).group(1)
     return id_to_preds
 
