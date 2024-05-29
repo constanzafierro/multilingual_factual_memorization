@@ -259,6 +259,13 @@ def get_memorized_dataset(
             f"{language}*{dataset_name.split('/')[1]}--{model_name}",
         )
     )
+    if len(eval_df_folder) > 1:
+        eval_df_folder = glob(
+            os.path.join(
+                eval_dir,
+                f"{language}_{dataset_name.split('/')[1]}--{model_name}",
+            )
+        )
     assert len(eval_df_folder) == 1, eval_df_folder
     eval_df_folder = eval_df_folder[0]
     eval_df_filename = os.path.join(eval_df_folder, "eval_per_example_records.json")
