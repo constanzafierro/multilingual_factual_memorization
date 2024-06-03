@@ -4,7 +4,6 @@ import os
 from collections import defaultdict
 
 import matplotlib.pyplot as plt
-import numpy
 import numpy as np
 import torch
 import wandb
@@ -35,12 +34,14 @@ def trace_with_patch(
     trace_layers=None,  # List of traced outputs to return
 ):
     """Copy of the function in causal_trace.ipynb"""
-    prng = numpy.random.RandomState(1)  # For reproducibility, use pseudorandom noise
+    prng = np.random.RandomState(1)  # For reproducibility, use pseudorandom noise
     patch_spec = defaultdict(list)
     for t, l in states_to_patch:
         patch_spec[l].append(t)
     embed_layername = layername(model, 0, "embed")
     if "decoder_input_ids" in inp:
+        # The encoder and decoder share the embedding layer so we need to check
+        # whether we have the encoder input to perform the noise addition.
         encoder_input_shape = inp["input_ids"].shape[-1]
 
     def untuple(x):
@@ -97,6 +98,7 @@ def calculate_hidden_flow(
     noise=0.1,
     window=10,
     kind=None,
+    samples=10,
 ):
     """
     Copy of the function in causal_trace.ipynb
@@ -105,10 +107,14 @@ def calculate_hidden_flow(
     """
     device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
     prompt = prepare_prompt(prompt, args.model_name_or_path, "", "t5" in mt.model_name)
-    inp = mt.tokenizer(prompt, return_tensors="pt").to(device)
+    inp = mt.tokenizer([prompt for _ in range(samples + 1)], return_tensors="pt").to(
+        device
+    )
     if decoder_prompt:
         decoder_input_ids = mt.tokenizer(
-            decoder_prompt, return_tensors="pt", add_special_tokens=False
+            [decoder_prompt for _ in range(samples + 1)],
+            return_tensors="pt",
+            add_special_tokens=False,
         ).input_ids.to(device)
         inp = {**inp, "decoder_input_ids": decoder_input_ids}
     with torch.no_grad():
