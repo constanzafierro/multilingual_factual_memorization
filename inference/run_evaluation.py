@@ -72,7 +72,7 @@ def load_sentinel_prediction(data_path, pred_prefix=False):
                 assert output_ids[:2] == [0, 250099]
                 id_to_preds[data["example_id"]] = (
                     output_ids[:3]
-                    if output_ids[:3] == [0, 250099, 290]
+                    if output_ids[:3] == [0, 250099, 259]
                     else output_ids[:2]
                 )
     return id_to_preds
