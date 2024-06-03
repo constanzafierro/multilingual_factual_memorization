@@ -107,35 +107,32 @@ def get_start_ans(pred, gt_list, ignore_from_punctuation=0):
 
 def add_exact_query(example, memorized_df, df_id_to_index):
     row = memorized_df.iloc[df_id_to_index[example["id"]]]
-    start_index = int(row["start_answer"].item())
-    if start_index != 0:
-        try:
-            # Note that this query_inference is assuming that the
-            # prepare_prompt will be called before this is fed into the model.
-            if "pred_with_special_tokens" in memorized_df.columns:
-                example["query_inference"] = example["query"]
-                example["decoder_prefix"] = row["pred_with_special_tokens"][
-                    :start_index
-                ]
-                example["prediction"] = row["pred_with_special_tokens"]
-            else:
+    if "decoder_input_ids" in memorized_df.columns:
+        # Note that this query_inference is assuming that the
+        # prepare_prompt will be called before this is fed into the model.
+        example["query_inference"] = example["query"]
+        example["decoder_input_ids"] = row["decoder_input_ids"]
+    else:
+        start_index = int(row["start_answer"].item())
+        if start_index != 0:
+            try:
                 example["query_inference"] = (
                     example["query"].strip()
                     + " "
                     + row["prediction"][:start_index].strip()
                 )
-                example["decoder_prefix"] = None
-                example["prediction"] = row["prediction"]
-        except Exception as e:
-            print("example in ds", example["query"])
-            print("row", row)
-            print("start_index", start_index)
-            print("prediction", row["prediction"])
-            raise (e)
-    else:
-        example["query_inference"] = example["query"]
-        example["decoder_prefix"] = None
-        example["prediction"] = row["prediction"]
+                example["decoder_input_ids"] = None
+
+            except Exception as e:
+                print("example in ds", example["query"])
+                print("row", row)
+                print("start_index", start_index)
+                print("prediction", row["prediction"])
+                raise (e)
+        else:
+            example["query_inference"] = example["query"]
+            example["decoder_input_ids"] = None
+    example["prediction"] = row["prediction"]
     return example
 
 
@@ -189,31 +186,22 @@ def _get_memorized_ds(dataset_name, eval_df_filename):
         log_trivial_examples_counts(memorized_df, ds)
 
     # Add 'query_inference' with all the tokens before the object.
-    if "pred_with_special_tokens" in memorized_df.columns:
-        memorized_df["start_answer"] = memorized_df.apply(
-            lambda ex: get_start_ans(
-                ex["pred_with_special_tokens"],
-                ex["ground_truth"],
-                ignore_from_punctuation=len("<pad> <extra_id_0>"),
-            ),
-            axis=1,
-        )
-    else:
+    if "pred_with_special_tokens" not in memorized_df.columns:
         memorized_df["start_answer"] = memorized_df.apply(
             lambda ex: get_start_ans(ex["prediction"], ex["ground_truth"]), axis=1
         )
-    if len(memorized_df[memorized_df.start_answer.isnull()]) > 0:
-        none_values = memorized_df[memorized_df.start_answer.isnull()]
-        print(
-            "Could not find the answer in the prediction for {} examples. "
-            "Data taken from: eval_df_filename={}, dataset_name={}".format(
-                len(none_values), eval_df_filename, dataset_name
+        if len(memorized_df[memorized_df.start_answer.isnull()]) > 0:
+            none_values = memorized_df[memorized_df.start_answer.isnull()]
+            print(
+                "Could not find the answer in the prediction for {} examples. "
+                "Data taken from: eval_df_filename={}, dataset_name={}".format(
+                    len(none_values), eval_df_filename, dataset_name
+                )
             )
-        )
-        if wandb.run is not None:
-            wandb.run.summary["answer_not_found"] = len(none_values)
-        memorized_df = memorized_df[~memorized_df.start_answer.isnull()]
-        ds = ds.filter(lambda ex: ex["id"] in set(memorized_df["id"].values))
+            if wandb.run is not None:
+                wandb.run.summary["answer_not_found"] = len(none_values)
+            memorized_df = memorized_df[~memorized_df.start_answer.isnull()]
+            ds = ds.filter(lambda ex: ex["id"] in set(memorized_df["id"].values))
     df_id_to_index = {id_: i for i, id_ in enumerate(memorized_df.id.values)}
     ds = ds.map(
         partial(

@@ -94,7 +94,7 @@ def calculate_hidden_flow(
     mt,
     prompt,
     subject,
-    decoder_prompt=None,
+    decoder_input_ids=None,
     noise=0.1,
     window=10,
     kind=None,
@@ -110,12 +110,10 @@ def calculate_hidden_flow(
     inp = mt.tokenizer([prompt for _ in range(samples + 1)], return_tensors="pt").to(
         device
     )
-    if decoder_prompt:
-        decoder_input_ids = mt.tokenizer(
-            [decoder_prompt for _ in range(samples + 1)],
-            return_tensors="pt",
-            add_special_tokens=False,
-        ).input_ids.to(device)
+    if decoder_input_ids:
+        decoder_input_ids = torch.tensor(
+            [decoder_input_ids for _ in range(samples + 1)]
+        ).to(device)
         inp = {**inp, "decoder_input_ids": decoder_input_ids}
     with torch.no_grad():
         answer_t, base_score = [d[0] for d in predict_from_input(mt.model, inp)]
@@ -142,7 +140,7 @@ def calculate_hidden_flow(
         )
     differences = differences.detach().cpu()
     input_ids = inp["input_ids"][0]
-    if decoder_prompt:
+    if decoder_input_ids:
         input_ids = np.concatenate(
             (
                 inp["input_ids"][0].detach().cpu().numpy(),
@@ -456,7 +454,7 @@ def plot_hidden_flow(
                 mt,
                 ex["query_inference"],
                 ex["sub_label"],
-                ex["decoder_prefix"],
+                ex["decoder_input_ids"],
                 noise=noise_level,
                 kind=kind,
             )
