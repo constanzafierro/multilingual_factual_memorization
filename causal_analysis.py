@@ -110,7 +110,7 @@ def calculate_hidden_flow(
     inp = mt.tokenizer([prompt for _ in range(samples + 1)], return_tensors="pt").to(
         device
     )
-    if decoder_input_ids:
+    if decoder_input_ids is not None:
         decoder_input_ids = torch.tensor(
             [decoder_input_ids for _ in range(samples + 1)]
         ).to(device)
@@ -140,7 +140,7 @@ def calculate_hidden_flow(
         )
     differences = differences.detach().cpu()
     input_ids = inp["input_ids"][0]
-    if decoder_input_ids:
+    if decoder_input_ids is not None:
         input_ids = np.concatenate(
             (
                 inp["input_ids"][0].detach().cpu().numpy(),
