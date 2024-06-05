@@ -368,6 +368,7 @@ def compute_averages(all_scores):
         "eos",
         "dec_bos",
         "dec_mask_token",
+        "dec",
         "last_token",
     ]
     scores = []
