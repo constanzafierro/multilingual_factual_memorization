@@ -20,6 +20,7 @@ from third_party.rome.experiments.causal_trace import (
 )
 from model_utils import load_model_and_tok
 from third_party.rome.util import nethook
+from transformers import T5TokenizerFast
 
 torch.set_grad_enabled(False)
 
@@ -288,34 +289,64 @@ def plot_averages(
 
 
 def agg_causal_analysis_results(tokenizer, ds, cache_output_dir, kind):
-    has_bos = (
-        tokenizer("some long text here")["input_ids"][0] in tokenizer.all_special_ids
+    tok_special_ids = set(tokenizer.all_special_ids)
+    has_bos = tokenizer("some long text here")["input_ids"][0] in tok_special_ids
+    has_eos = tokenizer("some long text here")["input_ids"][-1] in tok_special_ids
+    mask_token = (
+        None
+        if not isinstance(tokenizer, T5TokenizerFast)
+        else tokenizer("<extra_id_0>", add_special_tokens=False)["input_ids"][0]
     )
+    after_subj_last = "after_subj_last"
+    if has_eos:
+        after_subj_last = "eos"
     all_scores = []
     for ex in tqdm(ds, desc="Average Examples"):
         results_file = os.path.join(cache_output_dir, f"{ex['id']}{kind}.npz")
         numpy_result = np.load(
             os.path.join(cache_output_dir, results_file), allow_pickle=True
         )
+        decoder_input_ids = ex["decoder_input_ids"]
+        input_ids = numpy_result["input_ids"]
+        if decoder_input_ids:
+            encoder_scores = numpy_result["scores"][: -len(decoder_input_ids)]
+            decoder_scores = numpy_result["scores"][len(encoder_scores) :]
+            decoder_input_ids = input_ids[len(encoder_scores) :]
+            input_ids = input_ids[: len(encoder_scores)]
+
         ex_scores = collections.defaultdict(list)
         first_subj_token = numpy_result["subject_range"][0]
         last_subj_token = numpy_result["subject_range"][-1] - 1
-        ex_scores["last_subj_token"].append(numpy_result["scores"][last_subj_token])
-        ex_scores["first_subj_token"].append(numpy_result["scores"][first_subj_token])
+        # Subject tokens scores.
+        ex_scores["last_subj_token"].append(encoder_scores[last_subj_token])
+        ex_scores["first_subj_token"].append(encoder_scores[first_subj_token])
+        for i in range(first_subj_token + 1, last_subj_token):
+            ex_scores["mid_subj_tokens"].append(encoder_scores[i])
+        for i in range(first_subj_token, last_subj_token + 1):
+            ex_scores["all_subj_tokens"].append(encoder_scores[i])
+        # Before subject.
         for i in range(0, numpy_result["subject_range"][0]):
             if i == 0 and has_bos:
-                ex_scores["bos"].append(numpy_result["scores"][i])
+                ex_scores["bos"].append(encoder_scores[i])
+            elif input_ids[i] == mask_token:
+                ex_scores["mask_token"].append(encoder_scores[i])
             else:
-                ex_scores["before_subj"].append(numpy_result["scores"][i])
-        for i in range(first_subj_token + 1, last_subj_token):
-            ex_scores["mid_subj_tokens"].append(numpy_result["scores"][i])
-        for i in range(first_subj_token, last_subj_token + 1):
-            ex_scores["all_subj_tokens"].append(numpy_result["scores"][i])
+                ex_scores["before_subj"].append(encoder_scores[i])
+        # After subject.
         if last_subj_token < len(numpy_result["scores"]) - 1:
-            for i in range(last_subj_token, len(numpy_result["scores"])):
-                ex_scores["after_subj"].append(numpy_result["scores"][i])
-            ex_scores["after_subj_first"].append(numpy_result["scores"][0])
-            ex_scores["after_subj_last"].append(numpy_result["scores"][-1])
+            for i in range(last_subj_token, len(encoder_scores)):
+                ex_scores["after_subj"].append(encoder_scores[i])
+            ex_scores["after_subj_first"].append(encoder_scores[0])
+            ex_scores[after_subj_last].append(encoder_scores[-1])
+        # Decoder tokens.
+        if decoder_input_ids is not None:
+            for i in range(0, len(decoder_scores)):
+                if decoder_input_ids[i] in tok_special_ids:
+                    ex_scores["dec_bos"].append(decoder_scores[i])
+                elif decoder_input_ids[i] == mask_token:
+                    ex_scores["dec_mask_token"].append(decoder_scores[i])
+                else:
+                    ex_scores["dec"].append(decoder_scores[i])
         ex_scores["last_token"].append(numpy_result["scores"][-1])
         ex_scores["low_score"].append(numpy_result["low_score"])
         ex_scores["high_score"].append(numpy_result["high_score"])
@@ -334,6 +365,9 @@ def compute_averages(all_scores):
         "after_subj_first",
         "after_subj",
         "after_subj_last",
+        "eos",
+        "dec_bos",
+        "dec_mask_token",
         "last_token",
     ]
     scores = []
