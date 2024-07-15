@@ -338,6 +338,7 @@ def agg_causal_analysis_results(tokenizer, ds, cache_output_dir, kind):
                 ex_scores["after_subj"].append(encoder_scores[i])
             ex_scores["after_subj_first"].append(encoder_scores[0])
             ex_scores[after_subj_last].append(encoder_scores[-1])
+        ex_scores["last_token"].append(numpy_result["scores"][-1])
         # Decoder tokens.
         if decoder_input_ids is not None:
             for i in range(0, len(decoder_scores)):
@@ -347,7 +348,6 @@ def agg_causal_analysis_results(tokenizer, ds, cache_output_dir, kind):
                     ex_scores["dec_mask_token"].append(decoder_scores[i])
                 else:
                     ex_scores["dec"].append(decoder_scores[i])
-        ex_scores["last_token"].append(numpy_result["scores"][-1])
         ex_scores["low_score"].append(numpy_result["low_score"])
         ex_scores["high_score"].append(numpy_result["high_score"])
         all_scores.append(ex_scores)
@@ -477,6 +477,7 @@ def plot_hidden_flow(
     pdf_output_dir,
     kind,
     noise_level,
+    patch_k_layers,
     recompute_query_inference=False,
 ):
     for ex in tqdm(ds, desc="Examples"):
@@ -492,6 +493,7 @@ def plot_hidden_flow(
                 ex["decoder_input_ids"],
                 noise=noise_level,
                 kind=kind,
+                samples=patch_k_layers,
             )
             numpy_result = {
                 k: v.detach().cpu().numpy() if torch.is_tensor(v) else v
@@ -521,13 +523,12 @@ def main(args):
     )
     if args.only_subset:
         data_id = data_id + "_subset"
-    cache_dir = os.path.join(args.output_folder, args.model_name, data_id)
+    if args.patch_k_layers != 10:
+        data_id += f"_samples={args.patch_k_layers}"
     if args.override_noise_level is not None:
-        cache_dir = os.path.join(
-            args.output_folder,
-            args.model_name,
-            data_id + f"_noise={args.override_noise_level}",
-        )
+        data_id += +f"_noise={args.override_noise_level}"
+    cache_dir = os.path.join(args.output_folder, args.model_name, data_id)
+
     cache_hidden_flow = os.path.join(cache_dir, "cache_hidden_flow")
     plots_folder = "plots"
     if args.filter_trivial:
@@ -601,6 +602,7 @@ def main(args):
                 pdf_output_dir,
                 kind,
                 noise_level,
+                args.patch_k_layers,
                 recompute_query_inference=args.recompute_query_inference,
             )
         plot_average_trace_heatmap(
@@ -650,6 +652,7 @@ if __name__ == "__main__":
         type=str,
         help="",
     )
+    parser.add_argument("--patch_k_layers", type=int, default=10)
     parser.add_argument("--only_subset", action="store_true")
     parser.add_argument("--override_noise_level", type=float, help="")
     parser.add_argument("--only_plot_average", action="store_true")
