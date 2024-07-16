@@ -493,7 +493,7 @@ def plot_hidden_flow(
                 ex["decoder_input_ids"],
                 noise=noise_level,
                 kind=kind,
-                samples=patch_k_layers,
+                window=patch_k_layers,
             )
             numpy_result = {
                 k: v.detach().cpu().numpy() if torch.is_tensor(v) else v
