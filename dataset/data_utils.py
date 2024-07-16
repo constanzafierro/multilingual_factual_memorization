@@ -241,26 +241,32 @@ def get_memorized_dataset(
     resample_trivial=False,
     keep_only_trivial=False,
 ):
-    eval_df_folder = glob(
-        os.path.join(
-            eval_dir,
-            f"{language}*{dataset_name.split('/')[1]}--{model_name}",
-        )
+    eval_folder_glob = os.path.join(
+        eval_dir, f"{language}*{dataset_name.split('/')[1]}--{model_name}"
     )
-    if len(eval_df_folder) > 1:
-        eval_df_folder = glob(
+    if glob(os.path.join(eval_folder_glob, "sentinel_pred")):
+        eval_df_filename = glob(
             os.path.join(
-                eval_dir,
-                f"{language}_{dataset_name.split('/')[1]}--{model_name}",
+                eval_folder_glob, "sentinel_pred", "eval_per_example_records.json"
             )
         )
-    assert len(eval_df_folder) == 1, eval_df_folder
-    eval_df_folder = eval_df_folder[0]
-    eval_df_filename = os.path.join(eval_df_folder, "eval_per_example_records.json")
-    if os.path.exists(os.path.join(eval_df_folder, "sentinel_pred")):
-        eval_df_filename = os.path.join(
-            eval_df_folder, "sentinel_pred", "eval_per_example_records.json"
+    else:
+        eval_df_filename = glob(
+            os.path.join(
+                eval_folder_glob,
+                "eval_per_example_records.json",
+            )
         )
+        if len(eval_df_filename) > 1:
+            eval_df_filename = glob(
+                os.path.join(
+                    eval_dir,
+                    f"{language}_{dataset_name.split('/')[1]}--{model_name}",
+                    "eval_per_example_records.json",
+                )
+            )
+    assert len(eval_df_filename) == 1, eval_df_filename
+    eval_df_filename = eval_df_filename[0]
     if wandb.run is not None:
         wandb.config["eval_df_filename"] = eval_df_filename
     ds = _get_memorized_ds(dataset_name, eval_df_filename)
