@@ -308,6 +308,7 @@ def agg_causal_analysis_results(tokenizer, ds, cache_output_dir, kind):
         )
         decoder_input_ids = ex["decoder_input_ids"]
         input_ids = numpy_result["input_ids"]
+        encoder_scores = numpy_result["scores"]
         if decoder_input_ids:
             encoder_scores = numpy_result["scores"][: -len(decoder_input_ids)]
             decoder_scores = numpy_result["scores"][len(encoder_scores) :]
@@ -333,12 +334,14 @@ def agg_causal_analysis_results(tokenizer, ds, cache_output_dir, kind):
             else:
                 ex_scores["before_subj"].append(encoder_scores[i])
         # After subject.
-        if last_subj_token < len(numpy_result["scores"]) - 1:
+        if last_subj_token < len(encoder_scores) - 1:
             for i in range(last_subj_token, len(encoder_scores)):
-                ex_scores["after_subj"].append(encoder_scores[i])
+                if input_ids[i] == mask_token:
+                    ex_scores["mask_token"].append(encoder_scores[i])
+                else:
+                    ex_scores["after_subj"].append(encoder_scores[i])
             ex_scores["after_subj_first"].append(encoder_scores[0])
             ex_scores[after_subj_last].append(encoder_scores[-1])
-        ex_scores["last_token"].append(numpy_result["scores"][-1])
         # Decoder tokens.
         if decoder_input_ids is not None:
             for i in range(0, len(decoder_scores)):
@@ -348,6 +351,7 @@ def agg_causal_analysis_results(tokenizer, ds, cache_output_dir, kind):
                     ex_scores["dec_mask_token"].append(decoder_scores[i])
                 else:
                     ex_scores["dec"].append(decoder_scores[i])
+        ex_scores["last_token"].append(numpy_result["scores"][-1])
         ex_scores["low_score"].append(numpy_result["low_score"])
         ex_scores["high_score"].append(numpy_result["high_score"])
         all_scores.append(ex_scores)
@@ -357,6 +361,7 @@ def agg_causal_analysis_results(tokenizer, ds, cache_output_dir, kind):
 def compute_averages(all_scores):
     agg_tokens_keys = [
         "bos",
+        "mask_token",
         "before_subj",
         "first_subj_token",
         "mid_subj_tokens",
@@ -524,7 +529,7 @@ def main(args):
     if args.only_subset:
         data_id = data_id + "_subset"
     if args.patch_k_layers != 10:
-        data_id += f"_samples={args.patch_k_layers}"
+        data_id += f"_window={args.patch_k_layers}"
     if args.override_noise_level is not None:
         data_id += +f"_noise={args.override_noise_level}"
     cache_dir = os.path.join(args.output_folder, args.model_name, data_id)
