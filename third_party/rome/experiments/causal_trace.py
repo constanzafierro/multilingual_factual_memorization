@@ -530,11 +530,11 @@ def layername(model, num=-1, kind=None, stack="encoder"):
         if kind in kind_to_layer:
             return kind_to_layer[kind]
         kind_map = {
-            "attn": "0.SelfAttention",
-            "mlp": "1.DenseReluDense" if stack == "encoder" else "2.DenseReluDense",
+            "attn": "0.SelfAttention.dropout",
+            "mlp": "1" if stack == "encoder" else "2" + ".DenseReluDense.dropout",
         }
         return (
-            f'{stack}.block.{num}.layer{"" if kind is None else "." + kind_map[kind]}'
+            f'{stack}.block.{num}{"" if kind is None else ".layer." + kind_map[kind]}'
         )
     assert False, "unknown transformer structure"
 
