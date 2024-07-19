@@ -86,7 +86,7 @@ def remove_punc(text):
     return "".join(ch for ch in text if ch not in exclude)
 
 
-def get_start_ans(pred, gt_list, ignore_from_punctuation=0):
+def get_start_ans_idx(pred, gt_list, ignore_from_punctuation=0):
     start_idx = None
     pred = pred.lower()
     for gt in gt_list:
@@ -95,7 +95,7 @@ def get_start_ans(pred, gt_list, ignore_from_punctuation=0):
             start_idx = id_found
     gt_without_punc = [remove_punc(gt) for gt in gt_list]
     if start_idx is None and gt_list != gt_without_punc:
-        return get_start_ans(
+        return get_start_ans_idx(
             "{}{}".format(
                 pred[:ignore_from_punctuation],
                 remove_punc(pred[ignore_from_punctuation:]),
@@ -107,13 +107,18 @@ def get_start_ans(pred, gt_list, ignore_from_punctuation=0):
 
 def add_exact_query(example, memorized_df, df_id_to_index):
     row = memorized_df.iloc[df_id_to_index[example["id"]]]
-    if "decoder_input_ids" in memorized_df.columns:
+    start_index = int(row["start_answer"].item())
+    if "decoder_pred_with_special_tokens" in memorized_df.columns:
         # Note that this query_inference is assuming that the
         # prepare_prompt will be called before this is fed into the model.
         example["query_inference"] = example["query"]
-        example["decoder_input_ids"] = row["decoder_input_ids"]
+        decoder_tokens = row["decoder_tokens"]
+        ans_first_token_idx = None
+        for i, (from_, to) in enumerate(decoder_tokens["offset_mapping"]):
+            if start_index >= from_ and start_index < to:
+                ans_first_token_idx = i
+        example["decoder_input_ids"] = decoder_tokens["input_ids"][:ans_first_token_idx]
     else:
-        start_index = int(row["start_answer"].item())
         if start_index != 0:
             try:
                 example["query_inference"] = (
@@ -173,7 +178,7 @@ def log_trivial_examples_counts(memorized_df, ds):
     )
 
 
-def _get_memorized_ds(dataset_name, eval_df_filename):
+def _get_memorized_ds(dataset_name, eval_df_filename, tokenizer):
     inference_df = pd.read_json(eval_df_filename)
     memorized_df = inference_df[inference_df.exact_match].copy()
     ds = load_dataset(dataset_name)["train"]
@@ -186,22 +191,37 @@ def _get_memorized_ds(dataset_name, eval_df_filename):
         log_trivial_examples_counts(memorized_df, ds)
 
     # Add 'query_inference' with all the tokens before the object.
-    if "pred_with_special_tokens" not in memorized_df.columns:
-        memorized_df["start_answer"] = memorized_df.apply(
-            lambda ex: get_start_ans(ex["prediction"], ex["ground_truth"]), axis=1
+    if "decoder_pred_with_special_tokens" in memorized_df:
+        memorized_df["decoder_tokens"] = memorized_df.apply(
+            lambda row: tokenizer(
+                row["decoder_pred_with_special_tokens"],
+                return_offsets_mapping=True,
+                add_special_tokens=False,
+            ),
+            axis=1,
         )
-        if len(memorized_df[memorized_df.start_answer.isnull()]) > 0:
-            none_values = memorized_df[memorized_df.start_answer.isnull()]
-            print(
-                "Could not find the answer in the prediction for {} examples. "
-                "Data taken from: eval_df_filename={}, dataset_name={}".format(
-                    len(none_values), eval_df_filename, dataset_name
-                )
+        memorized_df["start_answer"] = memorized_df.apply(
+            lambda ex: get_start_ans_idx(
+                ex["decoder_pred_with_special_tokens"], ex["ground_truth"]
+            ),
+            axis=1,
+        )
+    else:
+        memorized_df["start_answer"] = memorized_df.apply(
+            lambda ex: get_start_ans_idx(ex["prediction"], ex["ground_truth"]), axis=1
+        )
+    if len(memorized_df[memorized_df.start_answer.isnull()]) > 0:
+        none_values = memorized_df[memorized_df.start_answer.isnull()]
+        print(
+            "Could not find the answer in the prediction for {} examples. "
+            "Data taken from: eval_df_filename={}, dataset_name={}".format(
+                len(none_values), eval_df_filename, dataset_name
             )
-            if wandb.run is not None:
-                wandb.run.summary["answer_not_found"] = len(none_values)
-            memorized_df = memorized_df[~memorized_df.start_answer.isnull()]
-            ds = ds.filter(lambda ex: ex["id"] in set(memorized_df["id"].values))
+        )
+        if wandb.run is not None:
+            wandb.run.summary["answer_not_found"] = len(none_values)
+        memorized_df = memorized_df[~memorized_df.start_answer.isnull()]
+        ds = ds.filter(lambda ex: ex["id"] in set(memorized_df["id"].values))
     df_id_to_index = {id_: i for i, id_ in enumerate(memorized_df.id.values)}
     ds = ds.map(
         partial(
@@ -235,14 +255,15 @@ def get_memorized_dataset(
     dataset_name,
     language,
     eval_dir,
-    model_name,
+    folder_model_name,
     only_subset,
+    tokenizer=None,
     filter_trivial=False,
     resample_trivial=False,
     keep_only_trivial=False,
 ):
     eval_folder_glob = os.path.join(
-        eval_dir, f"{language}*{dataset_name.split('/')[1]}--{model_name}"
+        eval_dir, f"{language}*{dataset_name.split('/')[1]}--{folder_model_name}"
     )
     if glob(os.path.join(eval_folder_glob, "sentinel_pred")):
         eval_df_filename = glob(
@@ -261,7 +282,7 @@ def get_memorized_dataset(
             eval_df_filename = glob(
                 os.path.join(
                     eval_dir,
-                    f"{language}_{dataset_name.split('/')[1]}--{model_name}",
+                    f"{language}_{dataset_name.split('/')[1]}--{folder_model_name}",
                     "eval_per_example_records.json",
                 )
             )
@@ -269,7 +290,7 @@ def get_memorized_dataset(
     eval_df_filename = eval_df_filename[0]
     if wandb.run is not None:
         wandb.config["eval_df_filename"] = eval_df_filename
-    ds = _get_memorized_ds(dataset_name, eval_df_filename)
+    ds = _get_memorized_ds(dataset_name, eval_df_filename, tokenizer)
     ds = filter_paraphrases(ds)
     if only_subset and len(ds) > 1000:
         total = max(1000, int(len(ds) * 0.1))
