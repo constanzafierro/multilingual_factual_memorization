@@ -4,7 +4,6 @@ import os
 import json
 import wandb
 from datasets import load_dataset
-from transformers import AutoTokenizer
 from inference.f1_score import compute_score
 import re
 from dataset.pararel_utils import OBJECT_KEY
@@ -52,7 +51,7 @@ def load_predictions(data_path):
     return id_to_preds
 
 
-def load_sentinel_prediction(data_path, pred_prefix=False):
+def load_sentinel_prediction(data_path, return_raw_ans=False):
     id_to_preds = {}
     with open(os.path.join(data_path, "raw_predictions.json")) as fhandle:
         for line in fhandle:
@@ -67,20 +66,18 @@ def load_sentinel_prediction(data_path, pred_prefix=False):
             sentinel_index, pred = re_split[1], re_split[2]
             assert sentinel_index == "0", answer
             id_to_preds[data["example_id"]] = pred
-            if pred_prefix:
+            if return_raw_ans:
                 output_ids = data["predictions"][0]["output_ids"]
                 assert output_ids[:2] == [0, 250099]
-                id_to_preds[data["example_id"]] = (
-                    output_ids[:3]
-                    if output_ids[:3] == [0, 250099, 259]
-                    else output_ids[:2]
-                )
+                id_to_preds[data["example_id"]] = data["predictions"][0]["answer"]
     return id_to_preds
 
 
 def add_raw_prediction(df, predictions_path):
-    id_to_pred_prefixes = load_sentinel_prediction(predictions_path, pred_prefix=True)
-    df["decoder_input_ids"] = df.apply(
+    id_to_pred_prefixes = load_sentinel_prediction(
+        predictions_path, return_raw_ans=True
+    )
+    df["decoder_pred_with_special_tokens"] = df.apply(
         lambda row: id_to_pred_prefixes[row["id"]], axis=1
     )
     return df
