@@ -577,6 +577,7 @@ def main(args):
         args.language,
         args.eval_dir,
         args.model_name,
+        mt.tokenizer,
         args.only_subset,
         args.filter_trivial,
         args.resample_trivial,
