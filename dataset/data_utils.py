@@ -200,9 +200,12 @@ def _get_memorized_ds(dataset_name, eval_df_filename, tokenizer):
             ),
             axis=1,
         )
+        decoder_prefix = "<pad> <extra_id_0>"
         memorized_df["start_answer"] = memorized_df.apply(
-            lambda ex: get_start_ans_idx(
-                ex["decoder_pred_with_special_tokens"], ex["ground_truth"]
+            lambda ex: len(decoder_prefix)
+            + get_start_ans_idx(
+                ex["decoder_pred_with_special_tokens"][len(decoder_prefix) :],
+                ex["ground_truth"],
             ),
             axis=1,
         )
