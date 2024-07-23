@@ -68,12 +68,13 @@ lang2 = "es"
 dataset_name = "coastalcph/xlingual_mpararel_autorr"
 model_name = "facebook/xglm-7.5B".replace("/", "__")
 eval_dir = "/projects/nlp/data/constanzam/cross_fact/eval/"
+only_subset = False
 ds1 = get_memorized_dataset(
     "coastalcph/xlingual_mpararel_autorr",
     lang1,
     eval_dir,
     model_name,
-    only_subset=True,
+    only_subset=only_subset,
     filter_trivial=True,
     resample_trivial=True,
 )
@@ -82,23 +83,23 @@ ds2 = get_memorized_dataset(
     lang2,
     eval_dir,
     model_name,
-    only_subset=True,
+    only_subset=only_subset,
     filter_trivial=True,
     resample_trivial=True,
 )
 # Note that we're taking only one template per subj-relation, there might be more.
 items1 = {"_".join(ex.split("_")[1:3]): ex for ex in ds1["id"]}
 items2 = {"_".join(ex.split("_")[1:3]): ex for ex in ds2["id"]}
-items_dict = {lang1: items1, lang2: items2}
-items = list(set(items1.keys()).intersection(items2.keys()))
+lang_to_mem_items = {lang1: items1, lang2: items2}
+shared_mem_items = list(set(items1.keys()).intersection(items2.keys()))
 
 i = 0
-print(items[i])
+print(shared_mem_items[i])
 plots_glob1 = os.path.join(
-    folder_pattern.format(lang1), f"plots_resample_trivial/*{items[i]}*.pdf"
+    folder_pattern.format(lang1), f"plots_resample_trivial/*{shared_mem_items[i]}*.pdf"
 )
 plots_glob2 = os.path.join(
-    folder_pattern.format(lang2), f"plots_resample_trivial/*{items[i]}*.pdf"
+    folder_pattern.format(lang2), f"plots_resample_trivial/*{shared_mem_items[i]}*.pdf"
 )
 #!imgcat $plots_glob1 $plots_glob2
 
@@ -107,7 +108,7 @@ for lang in [lang1, lang2]:
     for kind in ["attn", "mlp", None]:
         f = os.path.join(
             folder_pattern.format(lang),
-            f"cache_hidden_flow/{items_dict[lang][items[i]]}{kind}.npz",
+            f"cache_hidden_flow/{lang_to_mem_items[lang][shared_mem_items[i]]}{kind}.npz",
         )
         assert len(glob(f)) == 1, f
         numpy_results = np.load(glob(f)[0])
