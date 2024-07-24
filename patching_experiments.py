@@ -5,10 +5,8 @@ import os
 from dataset.data_utils import get_memorized_dataset, find_token_range
 from inference.run_inference import prepare_prompt
 from third_party.rome.experiments.causal_trace import (
-    collect_embedding_std,
     decode_tokens,
     layername,
-    plot_trace_heatmap,
     predict_from_input,
     predict_token,
 )
@@ -21,39 +19,51 @@ from patching_utils import (
 )
 
 
+def get_token_indices(token_to_patch, examples, input_ids, input_prompts, tokenizer):
+    if token_to_patch == "last":
+        token_idx_to_patch_from = -1
+        token_idx_to_patch = -1
+    elif token_to_patch == "last_subject_token":
+        subj_ranges = []
+        for ex, inp, prompt in zip(examples, input_ids, input_prompts):
+            subj_ranges.append(find_token_range(tokenizer, inp, ex["subject"], prompt))
+        token_idx_to_patch_from = subj_ranges[0][-1]
+        token_idx_to_patch = subj_ranges[1][-1]
+    return token_idx_to_patch_from, token_idx_to_patch
+
+
 def patch_ex1_into_ex2(
     mt, ex1, ex2, layers_to_patch, stack_to_patch, kind, token_to_patch="last"
 ):
     device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
-    assert ex1["obj_uri"] != ex2["obj_uri"]
-    inputs = []
+    input_prompts = []
     for ex in [ex1, ex2]:
         prompt = ex["query_inference"]
-        inputs.append(
+        input_prompts.append(
             prepare_prompt(prompt, args.model_name_or_path, "", "t5" in mt.model_name)
         )
-    # TODO: check that the function works well (the dimensions) with just "one sample".
-    inp = mt.tokenizer(inputs, return_tensors="pt").to(device)
-    # TODO: does this give the answer token for each input?
-    # TODO: add the object in the other languages to track as well.
+    # TODO: add padding
+    inp = mt.tokenizer(input_prompts, return_tensors="pt").to(device)
+    token_idx_to_patch_from, token_idx_to_patch = get_token_indices(
+        token_to_patch, [ex1, ex2], inp["input_ids"], input_prompts, mt.tokenizer
+    )
+    # TODO: add the object in the other languages to track as well?
     with torch.no_grad():
-        answer_t, base_score = [d[0] for d in predict_from_input(mt.model, inp)]
-    # TODO: check dimensions/list?
-    [answer] = decode_tokens(mt.tokenizer, [answer_t])
+        preds_tokens, preds_probs = [d[0] for d in predict_from_input(mt.model, inp)]
+    answers = decode_tokens(mt.tokenizer, preds_tokens)
     layers_results = []
-    if token_to_patch == "last":
-        token_idx_to_patch = -1
     for layer_i in range(0, layers_to_patch):
+        # TODO: add option in the function to have a tuple of tokens indices.
         r = trace_with_patch(
             mt.model,
             inp,
             [
                 (
-                    token_idx_to_patch,
+                    (token_idx_to_patch_from, token_idx_to_patch),
                     layername(mt.model, stack=stack_to_patch, num=layer_i, kind=kind),
                 )
             ],
-            answer_t,
+            preds_tokens,
             tokens_to_mix=None,
             noise=None,
         )
@@ -61,10 +71,10 @@ def patch_ex1_into_ex2(
     layers_results = torch.stack(layers_results).detach().cpu()
     return dict(
         scores=layers_results,
-        high_score=base_score,
+        high_score=preds_probs,
         input_ids=inp["input_ids"].detach().cpu().numpy(),
         input_tokens=decode_tokens(mt.tokenizer, inp["input_ids"]),
-        answer=answer,
+        answer=answers,
         window=layers_to_patch,
         kind=kind or "",
     )

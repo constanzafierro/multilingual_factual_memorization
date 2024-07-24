@@ -29,7 +29,9 @@ def trace_with_patch(
     noise=0.1,  # Level of noise to add
     trace_layers=None,  # List of traced outputs to return
 ):
-    """Copy of the function in causal_trace.ipynb"""
+    """The first example in the batch is used for patching in all the subsequent examples.
+    The probability is tracked over the mean of all the subsequent examples.
+    """
     prng = np.random.RandomState(1)  # For reproducibility, use pseudorandom noise
     patch_spec = defaultdict(list)
     for t, l in states_to_patch:
@@ -61,7 +63,10 @@ def trace_with_patch(
         # for selected tokens.
         h = untuple(x)
         for t in patch_spec[layer]:
-            h[1:, t] = h[0, t]
+            if isinstance(t, tuple):
+                h[1:, t[1]] = h[0, t[0]]
+            else:
+                h[1:, t] = h[0, t]
         return x
 
     # With the patching rules defined, run the patched model in inference.
@@ -74,7 +79,6 @@ def trace_with_patch(
         outputs_exp = model(**inp)
 
     # We report softmax probabilities for the answers_t token predictions of interest.
-    # TODO: answers_t is a list right?
     probs = torch.softmax(outputs_exp.logits[1:, -1, :], dim=1).mean(dim=0)[answers_t]
 
     # If tracing all layers, collect all activations together to return.
