@@ -79,6 +79,7 @@ def trace_with_patch(
         outputs_exp = model(**inp)
 
     # We report softmax probabilities for the answers_t token predictions of interest.
+    # TODO: fix for when we don't want the mean.
     probs = torch.softmax(outputs_exp.logits[1:, -1, :], dim=1).mean(dim=0)[answers_t]
 
     # If tracing all layers, collect all activations together to return.
@@ -91,13 +92,16 @@ def trace_with_patch(
     return probs
 
 
-def trace_important_states(model, num_layers, inp, e_range, answer_t, noise=0.1):
+def trace_important_states(
+    model, num_layers, inp, e_range, answer_t, noise=0.1, ntoks=None
+):
     """Copy of the function in causal_trace.ipynb"""
     table = []
     for ids_key, stack in [("input_ids", "encoder"), ("decoder_input_ids", "decoder")]:
         if ids_key not in inp:
             continue
-        ntoks = inp[ids_key].shape[1]
+        if ntoks is None:
+            ntoks = inp[ids_key].shape[1]
         for tnum in range(ntoks):
             row = []
             for layer in range(0, num_layers):
@@ -115,14 +119,15 @@ def trace_important_states(model, num_layers, inp, e_range, answer_t, noise=0.1)
 
 
 def trace_important_window(
-    model, num_layers, inp, e_range, answer_t, kind, window=10, noise=0.1
+    model, num_layers, inp, e_range, answer_t, kind, window=10, noise=0.1, ntoks=None
 ):
     """Copy of the function in causal_trace.ipynb"""
     table = []
     for ids_key, stack in [("input_ids", "encoder"), ("decoder_input_ids", "decoder")]:
         if ids_key not in inp:
             continue
-        ntoks = inp[ids_key].shape[1]
+        if ntoks is None:
+            ntoks = inp[ids_key].shape[1]
         for tnum in range(ntoks):
             row = []
             for layer in range(0, num_layers):
