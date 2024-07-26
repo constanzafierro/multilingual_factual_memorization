@@ -105,8 +105,8 @@ def trace_important_states(
         if ids_key not in inp:
             continue
         if ntoks is None:
-            ntoks = inp[ids_key].shape[1]
-        for tnum in range(ntoks):
+            ntoks = range(inp[ids_key].shape[1])
+        for tnum in ntoks:
             row = []
             for layer in range(0, num_layers):
                 r = trace_with_patch(
@@ -131,8 +131,8 @@ def trace_important_window(
         if ids_key not in inp:
             continue
         if ntoks is None:
-            ntoks = inp[ids_key].shape[1]
-        for tnum in range(ntoks):
+            ntoks = range(inp[ids_key].shape[1])
+        for tnum in ntoks:
             row = []
             for layer in range(0, num_layers):
                 layerlist = [
