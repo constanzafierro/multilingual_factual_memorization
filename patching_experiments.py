@@ -218,12 +218,17 @@ if __name__ == "__main__":
         help="",
     )
     parser.add_argument(
+        "--kind",
+        type=str,
+        default=None,
+    )
+    parser.add_argument(
         "--language",
         type=str,
         help="",
     )
     parser.add_argument(
-        "--languages",
+        "--languages_to_patch",
         nargs="+",
         required=True,
         help="",
