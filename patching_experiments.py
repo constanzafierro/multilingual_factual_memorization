@@ -98,11 +98,6 @@ def main(args):
     data_id = "_".join(
         [
             args.language,
-            (
-                args.dataset_name
-                if "/" not in args.dataset_name
-                else args.dataset_name.split("/")[1]
-            ),
             args.token_to_patch,
         ]
     )
@@ -230,7 +225,6 @@ if __name__ == "__main__":
     parser.add_argument(
         "--languages_to_patch",
         nargs="+",
-        required=True,
         help="",
     )
     parser.add_argument("--only_subset", action="store_true")
