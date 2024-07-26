@@ -82,7 +82,7 @@ def patch_ex1_into_ex2(mt, ex1, ex2, num_layers, kind, window, token_to_patch="l
             noise=None,
             ntoks=[(token_idx_to_patch_from, token_idx_to_patch)],
         )
-    results = torch.stack(results).detach().cpu()
+    results = results.detach().cpu()
     return dict(
         input_ids=inp["input_ids"].detach().cpu().numpy(),
         input_tokens=decode_tokens(mt.tokenizer, inp["input_ids"]),
