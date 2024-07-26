@@ -115,7 +115,7 @@ def main(args):
     if args.patch_k_layers != 10:
         data_id += f"_window={args.patch_k_layers}"
     output_folder = os.path.join(args.output_folder, args.model_name, data_id)
-    wandb.config["output_folder"] = output_folder
+    wandb.config["final_output_folder"] = output_folder
     os.makedirs(output_folder, exist_ok=True)
 
     mt = load_model_and_tok(args.model_name_or_path, args.model_name)
