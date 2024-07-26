@@ -34,7 +34,9 @@ def get_token_indices(token_to_patch, examples, input_ids, input_prompts, tokeni
     elif token_to_patch == "last_subject_token":
         subj_ranges = []
         for ex, inp, prompt in zip(examples, input_ids, input_prompts):
-            subj_ranges.append(find_token_range(tokenizer, inp, ex["subject"], prompt))
+            subj_ranges.append(
+                find_token_range(tokenizer, inp, ex["sub_label"], prompt)
+            )
         token_idx_to_patch_from = subj_ranges[0][-1] - 1
         token_idx_to_patch = subj_ranges[1][-1] - 1
     return token_idx_to_patch_from, token_idx_to_patch
