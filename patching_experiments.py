@@ -157,6 +157,7 @@ def main(args):
         df = pd.DataFrame(list(ds) + list(ds_other))
         groupped = (
             df[["relation", "sub_uri", "obj_uri", "language"]]
+            .drop_duplicates()
             .groupby(by=["relation", "sub_uri", "obj_uri"], as_index=False)
             .agg(list)
         )
