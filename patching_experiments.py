@@ -148,6 +148,7 @@ def main(args):
             args.filter_trivial,
             args.resample_trivial,
             args.keep_only_trivial,
+            log_to_wandb=False,
         )
         id_to_ex2 = {ex["id"]: ex for ex in ds_other}
         df = pd.DataFrame(list(ds) + list(ds_other))
