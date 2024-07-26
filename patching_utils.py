@@ -79,8 +79,12 @@ def trace_with_patch(
         outputs_exp = model(**inp)
 
     # We report softmax probabilities for the answers_t token predictions of interest.
-    # TODO: fix for when we don't want the mean.
-    probs = torch.softmax(outputs_exp.logits[1:, -1, :], dim=1).mean(dim=0)[answers_t]
+    if noise:
+        probs = torch.softmax(outputs_exp.logits[1:, -1, :], dim=1).mean(dim=0)[
+            answers_t
+        ]
+    else:
+        probs = torch.softmax(outputs_exp.logits[1:, -1, :], dim=1)[:, answers_t]
 
     # If tracing all layers, collect all activations together to return.
     if trace_layers is not None:
