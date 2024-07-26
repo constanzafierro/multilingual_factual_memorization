@@ -132,7 +132,8 @@ def main(args):
         args.resample_trivial,
         args.keep_only_trivial,
     )
-    id_to_ex1 = {ex["id"]: ex for ex in ds}
+    # Note that we are only keeping one template.
+    id_to_ex1 = {ex["id"][:-2]: ex for ex in ds}
     counts_per_lang = {}
     for lang in tqdm(args.languages_to_patch, desc="Languages"):
         if lang == args.language:
@@ -150,7 +151,7 @@ def main(args):
             args.keep_only_trivial,
             log_to_wandb=False,
         )
-        id_to_ex2 = {ex["id"]: ex for ex in ds_other}
+        id_to_ex2 = {ex["id"][:-2]: ex for ex in ds_other}
         df = pd.DataFrame(list(ds) + list(ds_other))
         groupped = (
             df[["relation", "sub_uri", "obj_uri", "language"]]
