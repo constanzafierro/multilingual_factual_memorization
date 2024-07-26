@@ -243,12 +243,7 @@ if __name__ == "__main__":
         args.model_name = args.model_name_or_path.replace("/", "__")
     wandb.init(
         project=f"patch_{args.token_to_patch}_mpararel",
-        name=" ".join(
-            [
-                args.model_name,
-                args.language,
-            ]
-        ),
+        name=" ".join([args.model_name, args.language, args.token_to_patch]),
         config=args,
     )
     main(args)

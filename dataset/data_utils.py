@@ -264,6 +264,7 @@ def get_memorized_dataset(
     filter_trivial=False,
     resample_trivial=False,
     keep_only_trivial=False,
+    log_to_wandb=True,
 ):
     eval_folder_glob = os.path.join(
         eval_dir, f"{language}*{dataset_name.split('/')[1]}--{folder_model_name}"
@@ -291,7 +292,7 @@ def get_memorized_dataset(
             )
     assert len(eval_df_filename) == 1, eval_df_filename
     eval_df_filename = eval_df_filename[0]
-    if wandb.run is not None:
+    if wandb.run is not None and log_to_wandb:
         wandb.config["eval_df_filename"] = eval_df_filename
     ds = _get_memorized_ds(dataset_name, eval_df_filename, tokenizer)
     ds = filter_paraphrases(ds)
