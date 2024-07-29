@@ -134,7 +134,7 @@ def get_output_dir(args):
 def main(args):
     output_folder = get_output_dir(args)
     device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
-    mt = load_model_and_tok(args)
+    mt = load_model_and_tok(args.model_name_or_path, args.model_name)
     dataset_name = get_dataset_name(args.model_name, args.language)
     ds = get_memorized_dataset(
         dataset_name,
@@ -236,11 +236,6 @@ if __name__ == "__main__":
         "--eval_dir",
         type=str,
         help="",
-    )
-    parser.add_argument(
-        "--kind",
-        type=str,
-        default=None,
     )
     parser.add_argument(
         "--language",
