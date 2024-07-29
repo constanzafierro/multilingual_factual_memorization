@@ -169,7 +169,7 @@ def main(args):
         ]
         counts_per_lang[lang] = len(shared_ids)
         for ex_id in tqdm(shared_ids, desc="Examples"):
-            filename = os.path.join(output_folder, f"{ex_id}_{args.kind}.npz")
+            filename = os.path.join(output_folder, f"{lang}_{ex_id}_{args.kind}.npz")
             if not os.path.isfile(filename):
                 result = patch_ex1_into_ex2(
                     mt,
@@ -184,8 +184,10 @@ def main(args):
                     k: v.detach().cpu().numpy() if torch.is_tensor(v) else v
                     for k, v in result.items()
                 }
+                result["source_lang"] = args.language
+                result["target_lang"] = lang
                 np.savez(filename, **numpy_result)
-    wandb.log({"count_{lang}": c for lang, c in counts_per_lang.items()})
+    wandb.log({f"count_{lang}": c for lang, c in counts_per_lang.items()})
 
     print("Writing config")
     with open(os.path.join(output_folder, "args.json"), "w") as f:
