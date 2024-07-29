@@ -1,19 +1,22 @@
 import argparse
+import collections
+import json
+import os
+
+import numpy as np
+import pandas as pd
+import torch
 import wandb
 from tqdm import tqdm
-import os
-from dataset.data_utils import get_memorized_dataset, find_token_range
+
+from dataset.data_utils import find_token_range, get_memorized_dataset
 from inference.run_inference import prepare_prompt
+from model_utils import load_model_and_tok
+from patching_utils import trace_important_states, trace_important_window
 from third_party.rome.experiments.causal_trace import (
     decode_tokens,
     predict_from_input,
 )
-import json
-import torch
-import numpy as np
-import pandas as pd
-from model_utils import load_model_and_tok
-from patching_utils import trace_important_states, trace_important_window
 
 
 def get_dataset_name(model_name, language):
@@ -136,7 +139,7 @@ def main(args):
     )
     # Note that we are only keeping one template.
     id_to_ex1 = {ex["id"][: ex["id"].rfind("_")]: ex for ex in ds}
-    counts_per_lang = {}
+    counts = collections.defaultdict(int)
     for lang in tqdm(args.languages_to_patch, desc="Languages"):
         if lang == args.language:
             continue
@@ -167,8 +170,13 @@ def main(args):
         shared_ids = [
             "_".join(ids) for ids in mem_shared_en[["relation", "sub_uri"]].values
         ]
-        counts_per_lang[lang] = len(shared_ids)
+        counts[f"shared_{lang}"] = len(shared_ids)
         for ex_id in tqdm(shared_ids, desc="Examples"):
+            if (
+                id_to_ex1[f"{args.language}_{ex_id}"]["sub_label"]
+                == id_to_ex2[f"{lang}_{ex_id}"]["sub_label"]
+            ):
+                counts[f"same_spelling_{lang}"] += 1
             filename = os.path.join(output_folder, f"{lang}_{ex_id}_{args.kind}.npz")
             if not os.path.isfile(filename):
                 result = patch_ex1_into_ex2(
@@ -187,7 +195,7 @@ def main(args):
                 result["source_lang"] = args.language
                 result["target_lang"] = lang
                 np.savez(filename, **numpy_result)
-    wandb.log({f"count_{lang}": c for lang, c in counts_per_lang.items()})
+    wandb.log({k: c for k, c in counts.items()})
 
     print("Writing config")
     with open(os.path.join(output_folder, "args.json"), "w") as f:
