@@ -9,7 +9,7 @@ import torch
 import wandb
 from tqdm import tqdm
 
-from dataset.data_utils import find_token_range, get_memorized_dataset
+from dataset.data_utils import find_token_range, get_memorized_dataset, get_dataset_name
 from inference.run_inference import prepare_prompt
 from model_utils import load_model_and_tok
 from patching_utils import trace_important_states, trace_important_window
@@ -17,17 +17,6 @@ from third_party.rome.experiments.causal_trace import (
     decode_tokens,
     predict_from_input,
 )
-
-
-def get_dataset_name(model_name, language):
-    if "t5" in model_name:
-        return "coastalcph/xlingual_mpararel_mlm"
-    else:
-        return (
-            "coastalcph/xlingual_mpararel_autorr"
-            if language not in {"fa", "tr", "ko", "ja"}
-            else "coastalcph/mpararel_autorr"
-        )
 
 
 def get_token_indices(token_to_patch, examples, input_ids, input_prompts, tokenizer):
@@ -203,7 +192,7 @@ def main(args):
 
 
 if __name__ == "__main__":
-    parser = argparse.ArgumentParser(description="Inference")
+    parser = argparse.ArgumentParser()
     parser.add_argument(
         "--model_name_or_path",
         required=True,

@@ -27,6 +27,17 @@ TOKENIZER_TO_PREPEND_SPACE = {
 }
 
 
+def get_dataset_name(model_name, language):
+    if "t5" in model_name:
+        return "coastalcph/xlingual_mpararel_mlm"
+    else:
+        return (
+            "coastalcph/xlingual_mpararel_autorr"
+            if language not in {"fa", "tr", "ko", "ja"}
+            else "coastalcph/mpararel_autorr"
+        )
+
+
 def find_token_range(tokenizer, token_ids_array, subject, prompt):
     if TOKENIZER_TO_PREPEND_SPACE[type(tokenizer)] and not prompt.startswith(subject):
         subject = " " + subject

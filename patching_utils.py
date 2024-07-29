@@ -1,23 +1,10 @@
-import argparse
-import collections
-import os
 from collections import defaultdict
 
 import numpy as np
 import torch
-from dataset.data_utils import get_memorized_dataset, find_token_range
-from inference.run_inference import prepare_prompt
-from third_party.rome.experiments.causal_trace import (
-    collect_embedding_std,
-    decode_tokens,
-    layername,
-    plot_trace_heatmap,
-    predict_from_input,
-    predict_token,
-)
-from model_utils import load_model_and_tok
+
+from third_party.rome.experiments.causal_trace import layername
 from third_party.rome.util import nethook
-from transformers import T5TokenizerFast
 
 
 def trace_with_patch(
