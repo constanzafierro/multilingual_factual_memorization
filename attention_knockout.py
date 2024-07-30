@@ -183,8 +183,8 @@ def main(args):
         ]:
             for layer in range(mt.num_layers):
                 layers_to_block = range(
-                    max(0, layer - args.window // 2),
-                    min(mt.num_layers, layer - (-args.window // 2)),
+                    max(0, layer - args.patch_k_layers // 2),
+                    min(mt.num_layers, layer - (-args.patch_k_layers // 2)),
                 )
                 block_config = {
                     l_block: [(last_token, to_block) for to_block in block_indices]
