@@ -147,7 +147,11 @@ def main(args):
         args.resample_trivial,
         args.keep_only_trivial,
     )
-
+    already_computed_blocks = set()
+    existing_df = None
+    if os.path.isfile(os.path.join(output_folder, "results.csv")):
+        existing_df = pd.read_csv(os.path.join(output_folder, "results.csv"))
+        already_computed_blocks = existing_df.block_desc.unique()
     # Run attention knockouts
     results = []
     for ex in tqdm(ds, desc="Examples"):
@@ -170,17 +174,16 @@ def main(args):
         [answer] = decode_tokens(mt.tokenizer, [answer_t])
 
         tokens_count = inp["input_ids"].shape[1]
-        last_token = (
-            tokens_count - 1
-            if inp["input_ids"][0][-1] not in mt.tokenizer.all_special_ids
-            else tokens_count - 2
-        )
+        last_token = tokens_count - 1
 
         for block_indices, block_desc in [
             ([x for x in e_range], "subject"),
+            ([e_range[-1]], "last_subject"),
             ([x for x in range(tokens_count - 1) if x not in e_range], "non-subject"),
             ([last_token], "last"),
         ]:
+            if block_desc in already_computed_blocks:
+                continue
             for layer in range(mt.num_layers):
                 layers_to_block = range(
                     max(0, layer - args.patch_k_layers // 2),
@@ -206,7 +209,12 @@ def main(args):
                     }
                 )
     df = pd.DataFrame(results)
-    df.to_csv(os.path.join(output_folder, "results.csv"), index=False)
+    if existing_df:
+        pd.concat([existing_df, df]).to_csv(
+            os.path.join(output_folder, "results.csv"), index=False
+        )
+    else:
+        df.to_csv(os.path.join(output_folder, "results.csv"), index=False)
     print("Writing config")
     with open(os.path.join(output_folder, "args.json"), "w") as f:
         json.dump(args.__dict__, f, indent=2)
