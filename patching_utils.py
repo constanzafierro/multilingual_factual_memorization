@@ -116,7 +116,8 @@ def trace_important_states(
             if noise:
                 table.append(torch.stack(row))
             else:
-                table.append([torch.stack(r) for r in row])
+                for i in range(len(row[0])):
+                    table.append(torch.stack([r[i] for r in row]))
     return torch.stack(table) if noise else [torch.stack(t) for t in table]
 
 
