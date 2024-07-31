@@ -50,7 +50,9 @@ def patch_ex1_into_ex2(mt, ex1, ex2, num_layers, kind, window, token_to_patch="l
     )
     # TODO: add the object in the other languages to track as well?
     with torch.no_grad():
-        preds_tokens, preds_probs = predict_from_input(mt.model, inp)
+        preds_tokens, preds_probs, base_entropies = predict_from_input(
+            mt.model, inp, entropy=True
+        )
     answers = decode_tokens(mt.tokenizer, preds_tokens)
     if kind is None:
         results = trace_important_states(
@@ -78,14 +80,15 @@ def patch_ex1_into_ex2(mt, ex1, ex2, num_layers, kind, window, token_to_patch="l
     return dict(
         input_ids=inp["input_ids"].detach().cpu().numpy(),
         input_tokens=decode_tokens(mt.tokenizer, inp["input_ids"]),
-        input_preds_probs=preds_probs,
-        answer=answers,
+        base_probs=preds_probs,
+        base_answers=answers,
+        base_entropies=base_entropies,
         window=window,
         # The probability of getting each of the answers.
-        scores=probs,
-        ranks=ranks,
-        pred_token=pred_token,
-        entropy=entropy,
+        patch_probs=probs,
+        patch_ranks=ranks,
+        patch_pred_token=pred_token,
+        patch_entropy=entropy,
         patched_tokens_from_to=(token_idx_to_patch_from, token_idx_to_patch),
         kind=kind or "",
     )
@@ -170,7 +173,7 @@ def main(args):
             ):
                 counts[f"same_spelling_{lang}"] += 1
             filename = os.path.join(output_folder, f"{lang}_{ex_id}_{args.kind}.npz")
-            if not os.path.isfile(filename) and not args.override_results:
+            if not os.path.isfile(filename) or args.override_results:
                 result = patch_ex1_into_ex2(
                     mt,
                     id_to_ex1[f"{args.language}_{ex_id}"],
