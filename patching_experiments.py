@@ -74,7 +74,7 @@ def patch_ex1_into_ex2(mt, ex1, ex2, num_layers, kind, window, token_to_patch="l
             noise=None,
             ntoks=[(token_idx_to_patch_from, token_idx_to_patch)],
         )
-    results = results.detach().cpu()
+    probs, ranks, pred_token, entropy = [r.detach().cpu() for r in results]
     return dict(
         input_ids=inp["input_ids"].detach().cpu().numpy(),
         input_tokens=decode_tokens(mt.tokenizer, inp["input_ids"]),
@@ -82,7 +82,10 @@ def patch_ex1_into_ex2(mt, ex1, ex2, num_layers, kind, window, token_to_patch="l
         answer=answers,
         window=window,
         # The probability of getting each of the answers.
-        scores=results,
+        scores=probs,
+        ranks=ranks,
+        pred_token=pred_token,
+        entropy=entropy,
         patched_tokens_from_to=(token_idx_to_patch_from, token_idx_to_patch),
         kind=kind or "",
     )
@@ -183,6 +186,7 @@ def main(args):
                 }
                 result["source_lang"] = args.language
                 result["target_lang"] = lang
+                result["ex_id"] = ex_id
                 np.savez(filename, **numpy_result)
     wandb.log({k: c for k, c in counts.items()})
 
