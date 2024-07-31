@@ -209,7 +209,7 @@ def main(args):
                     }
                 )
     df = pd.DataFrame(results)
-    if existing_df:
+    if existing_df is not None:
         pd.concat([existing_df, df]).to_csv(
             os.path.join(output_folder, "results.csv"), index=False
         )
