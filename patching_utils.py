@@ -73,7 +73,7 @@ def trace_with_patch(
     else:
         probs = torch.softmax(outputs_exp.logits[1:, -1, :], dim=1)
         sort_ind = np.argsort(-probs.detach().cpu().numpy(), axis=-1)
-        ranks = np.where(np.in1d(sort_ind, answers_t))[0]
+        ranks = np.where(np.in1d(sort_ind, answers_t.detach().cpu().numpy()))[0]
         entropy = -torch.sum(probs * torch.log(probs + 1e-10))
         probs = probs[:, answers_t]
         pred_token = sort_ind[0][0]
