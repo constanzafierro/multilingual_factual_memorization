@@ -111,8 +111,11 @@ def trace_important_states(
                     noise=noise,
                 )
                 row.append(r)
-            table.append(torch.stack(row))
-    return torch.stack(table)
+            if noise:
+                table.append(torch.stack(row))
+            else:
+                table.append([torch.stack(r) for r in row])
+    return torch.stack(table) if noise else [torch.stack(t) for t in table]
 
 
 def trace_important_window(
