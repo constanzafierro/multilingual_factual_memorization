@@ -170,7 +170,7 @@ def main(args):
             ):
                 counts[f"same_spelling_{lang}"] += 1
             filename = os.path.join(output_folder, f"{lang}_{ex_id}_{args.kind}.npz")
-            if not os.path.isfile(filename):
+            if not os.path.isfile(filename) and not args.override_results:
                 result = patch_ex1_into_ex2(
                     mt,
                     id_to_ex1[f"{args.language}_{ex_id}"],
@@ -239,6 +239,7 @@ if __name__ == "__main__":
     parser.add_argument("--filter_trivial", action="store_true")
     parser.add_argument("--keep_only_trivial", action="store_true")
     parser.add_argument("--resample_trivial", action="store_true")
+    parser.add_argument("--override_results", action="store_true")
     parser.add_argument("--patch_k_layers", type=int, default=10)
     parser.add_argument(
         "--token_to_patch",
