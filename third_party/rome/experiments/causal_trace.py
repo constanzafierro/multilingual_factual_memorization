@@ -685,10 +685,12 @@ def predict_token(mt, prompts, decoder_prompt=None, return_p=False):
     return result
 
 
-def predict_from_input(model, inp):
+def predict_from_input(model, inp, entropy=False):
     out = model(**inp)["logits"]
     probs = torch.softmax(out[:, -1], dim=1)
     p, preds = torch.max(probs, dim=1)
+    if entropy:
+        return preds, p, -torch.sum(probs * torch.log(probs + 1e-10), dim=-1)
     return preds, p
 
 
