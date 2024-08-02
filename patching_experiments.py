@@ -111,11 +111,49 @@ def get_last_subj_token_experiment_ids(ds, ds_other):
     mem_shared_en = groupped[
         groupped.language.apply(lambda langs: len(langs) > 1)
     ].reset_index()
-    return ["_".join(ids) for ids in mem_shared_en[["relation", "sub_uri"]].values]
+    langs = [ds[0]["language"], ds_other[0]["language"]]
+    return [
+        (f"{langs[0]}_{r}_{s}", f"{langs[1]}_{r}_{s}")
+        for r, s in mem_shared_en[["relation", "sub_uri"]].values
+    ]
 
 
 def get_last_token_experiment_ids(ds, ds_other):
-    pass
+    source_subj_to_relations = collections.defaultdict(list)
+    target_subj_to_relations = collections.defaultdict(list)
+    for ex in ds:
+        source_subj_to_relations[ex["sub_uri"]].append(ex["relation"])
+    for ex in ds_other:
+        target_subj_to_relations[ex["sub_uri"]].append(ex["relation"])
+    data = []
+    for s, relations in source_subj_to_relations.items():
+        data.append(
+            {
+                "sub_uri": s,
+                "source_relations": relations,
+                "target_relations": target_subj_to_relations[s],
+            }
+        )
+    df = pd.DataFrame(data)
+    df["combinations"] = df.apply(
+        lambda row: [
+            pair
+            for pair in product(row["source_relations"], row["target_relations"])
+            if pair[0] != pair[1]
+        ],
+        axis=1,
+    )
+    subj_relations = df[df.combinations.astype(bool)][
+        ["sub_uri", "combinations"]
+    ].values
+    langs = [ds[0]["language"], ds_other[0]["language"]]
+    examples_ids = []
+    for s, relation_pairs in subj_relations:
+        for r_source, r_target in relation_pairs:
+            examples_ids.append(
+                (f"{langs[0]}_{r_source}_{s}", f"{langs[1]}_{r_target}_{s}")
+            )
+    return examples_ids
 
 
 def main(args):
@@ -177,18 +215,20 @@ def main(args):
         )
         id_to_ex2 = {ex["id"][: ex["id"].rfind("_")]: ex for ex in ds_other}
         if args.token_to_patch == "last_subject_token":
-            shared_ids = get_last_subj_token_experiment_ids(ds, ds_other)
+            ids_to_patch = get_last_subj_token_experiment_ids(ds, ds_other)
         elif args.token_to_patch == "last":
-            shared_ids = get_last_token_experiment_ids(ds, ds_other)
+            ids_to_patch = get_last_token_experiment_ids(ds, ds_other)
 
-        counts[f"shared_{lang}"] = len(shared_ids)
-        for ex_id in tqdm(shared_ids, desc="Examples"):
-            filename = os.path.join(output_folder, f"{lang}_{ex_id}_{args.kind}.npz")
+        counts[f"patched_examples/{lang}"] = len(ids_to_patch)
+        for ex_id_source, ex_id_target in tqdm(ids_to_patch, desc="Examples"):
+            filename = os.path.join(
+                output_folder, f"{ex_id_source}_{ex_id_target}_{args.kind}.npz"
+            )
             if not os.path.isfile(filename) or args.override_results:
                 result = patch_ex1_into_ex2(
                     mt,
-                    id_to_ex1[f"{args.language}_{ex_id}"],
-                    id_to_ex2[f"{lang}_{ex_id}"],
+                    id_to_ex1[ex_id_source],
+                    id_to_ex2[ex_id_target],
                     mt.num_layers,
                     kind=args.kind,
                     window=args.patch_k_layers,
@@ -200,7 +240,8 @@ def main(args):
                 }
                 result["source_lang"] = args.language
                 result["target_lang"] = lang
-                result["ex_id"] = ex_id
+                result["ex_id_source"] = ex_id_source
+                result["ex_id_target"] = ex_id_target
                 np.savez(filename, **numpy_result)
     wandb.log({k: c for k, c in counts.items()})
 
