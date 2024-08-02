@@ -73,13 +73,14 @@ def trace_with_patch(
     else:
         probs = torch.softmax(outputs_exp.logits[1:, -1, :], dim=1)
         sort_ind = np.argsort(-probs.detach().cpu().numpy(), axis=-1)
-        ranks = torch.tensor(
-            np.where(np.in1d(sort_ind, answers_t.detach().cpu().numpy()))[0]
-        )
+        ranks = np.where(np.isin(sort_ind, answers_t.detach().cpu().numpy()))
+        ranks_from_tokens = sort_ind[ranks]
+        ranks = torch.tensor(ranks[1])  # The first position only contains 0s.
+
         entropy = -torch.sum(probs * torch.log(probs + 1e-10))
         probs = probs[:, answers_t]
         pred_token = torch.tensor(sort_ind[0][0])
-        return probs, ranks, pred_token, entropy
+        return probs, ranks, ranks_from_tokens, pred_token, entropy
 
     # If tracing all layers, collect all activations together to return.
     if trace_layers is not None:

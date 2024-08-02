@@ -2,6 +2,7 @@ import argparse
 import collections
 import json
 import os
+from itertools import product
 
 import numpy as np
 import pandas as pd
@@ -9,7 +10,7 @@ import torch
 import wandb
 from tqdm import tqdm
 
-from dataset.data_utils import find_token_range, get_memorized_dataset, get_dataset_name
+from dataset.data_utils import find_token_range, get_dataset_name, get_memorized_dataset
 from inference.run_inference import prepare_prompt
 from model_utils import load_model_and_tok
 from patching_utils import trace_important_states, trace_important_window
@@ -77,22 +78,44 @@ def patch_ex1_into_ex2(mt, ex1, ex2, num_layers, kind, window, token_to_patch="l
             noise=None,
             ntoks=[(token_idx_to_patch_from, token_idx_to_patch)],
         )
-    probs, ranks, pred_token, entropy = [r.detach().cpu() for r in results]
+    probs, ranks, ranks_from_tokens, pred_token, entropy = [
+        r.detach().cpu() for r in results
+    ]
     return dict(
         input_ids=inp["input_ids"].detach().cpu().numpy(),
         input_tokens=decode_tokens(mt.tokenizer, inp["input_ids"]),
         base_probs=preds_probs,
+        base_answer_tokens=preds_tokens,
         base_answers=answers,
         base_entropies=base_entropies,
         window=window,
         # The probability of getting each of the answers.
         patch_probs=probs,
         patch_ranks=ranks,
+        patch_ranks_tokens=ranks_from_tokens,
         patch_pred_token=pred_token,
         patch_entropy=entropy,
         patched_tokens_from_to=(token_idx_to_patch_from, token_idx_to_patch),
         kind=kind or "",
     )
+
+
+def get_last_subj_token_experiment_ids(ds, ds_other):
+    df = pd.DataFrame(list(ds) + list(ds_other))
+    groupped = (
+        df[["relation", "sub_uri", "obj_uri", "language"]]
+        .drop_duplicates()
+        .groupby(by=["relation", "sub_uri", "obj_uri"], as_index=False)
+        .agg(list)
+    )
+    mem_shared_en = groupped[
+        groupped.language.apply(lambda langs: len(langs) > 1)
+    ].reset_index()
+    return ["_".join(ids) for ids in mem_shared_en[["relation", "sub_uri"]].values]
+
+
+def get_last_token_experiment_ids(ds, ds_other):
+    pass
 
 
 def main(args):
@@ -153,26 +176,13 @@ def main(args):
             log_to_wandb=False,
         )
         id_to_ex2 = {ex["id"][: ex["id"].rfind("_")]: ex for ex in ds_other}
-        df = pd.DataFrame(list(ds) + list(ds_other))
-        groupped = (
-            df[["relation", "sub_uri", "obj_uri", "language"]]
-            .drop_duplicates()
-            .groupby(by=["relation", "sub_uri", "obj_uri"], as_index=False)
-            .agg(list)
-        )
-        mem_shared_en = groupped[
-            groupped.language.apply(lambda langs: len(langs) > 1)
-        ].reset_index()
-        shared_ids = [
-            "_".join(ids) for ids in mem_shared_en[["relation", "sub_uri"]].values
-        ]
+        if args.token_to_patch == "last_subject_token":
+            shared_ids = get_last_subj_token_experiment_ids(ds, ds_other)
+        elif args.token_to_patch == "last":
+            shared_ids = get_last_token_experiment_ids(ds, ds_other)
+
         counts[f"shared_{lang}"] = len(shared_ids)
         for ex_id in tqdm(shared_ids, desc="Examples"):
-            if (
-                id_to_ex1[f"{args.language}_{ex_id}"]["sub_label"]
-                == id_to_ex2[f"{lang}_{ex_id}"]["sub_label"]
-            ):
-                counts[f"same_spelling_{lang}"] += 1
             filename = os.path.join(output_folder, f"{lang}_{ex_id}_{args.kind}.npz")
             if not os.path.isfile(filename) or args.override_results:
                 result = patch_ex1_into_ex2(
