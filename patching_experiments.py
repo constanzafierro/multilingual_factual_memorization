@@ -45,6 +45,7 @@ def patch_ex1_into_ex2(mt, ex1, ex2, num_layers, kind, window, token_to_patch="l
         )
     mt.tokenizer.padding_side = "left"
     inp = mt.tokenizer(input_prompts, return_tensors="pt", padding=True).to(device)
+    inp = mt.model.prepare_inputs_for_generation(**inp)
     token_idx_to_patch_from, token_idx_to_patch = get_token_indices(
         token_to_patch, [ex1, ex2], inp["input_ids"], input_prompts, mt.tokenizer
     )
