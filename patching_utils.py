@@ -63,15 +63,17 @@ def trace_with_patch(
         [embed_layername] + list(patch_spec.keys()) + additional_layers,
         edit_output=patch_rep,
     ) as td:
-        outputs_exp = model(**inp)
+        outputs_exp = model.generate(
+            **inp, max_new_tokens=1, output_logits=True, return_dict_in_generate=True
+        )
 
     # We report softmax probabilities for the answers_t token predictions of interest.
     if noise:
-        probs = torch.softmax(outputs_exp.logits[1:, -1, :], dim=1).mean(dim=0)[
+        probs = torch.softmax(outputs_exp.logits[-1][1:, :], dim=1).mean(dim=0)[
             answers_t
         ]
     else:
-        probs = torch.softmax(outputs_exp.logits[1:, -1, :], dim=1)
+        probs = torch.softmax(outputs_exp.logits[-1][1:, :], dim=1)
         sort_ind = np.argsort(-probs.detach().cpu().numpy(), axis=-1)
         ranks = np.where(np.isin(sort_ind, answers_t.detach().cpu().numpy()))
         ranks_from_tokens = torch.tensor(sort_ind[ranks])
