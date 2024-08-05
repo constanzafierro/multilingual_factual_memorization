@@ -50,11 +50,14 @@ def patch_ex1_into_ex2(mt, ex1, ex2, num_layers, kind, window, token_to_patch="l
     token_idx_to_patch_from, token_idx_to_patch = get_token_indices(
         token_to_patch, [ex1, ex2], inp["input_ids"], input_prompts, mt.tokenizer
     )
-    # TODO: add the object in the other languages to track as well?
-    with torch.no_grad():
-        preds_tokens, preds_probs, base_entropies = predict_from_input(
-            mt.model, inp, entropy=True
-        )
+
+    output = mt.model.generate(
+        **inp, max_new_tokens=1, return_dict_in_generate=True, output_logits=True
+    )
+    probs = torch.softmax(output.logits[-1], dim=-1)
+    preds_probs, preds_tokens = torch.max(probs, dim=-1)
+    base_entropies = -torch.sum(probs * torch.log(probs + 1e-10), dim=-1)
+
     answers = decode_tokens(mt.tokenizer, preds_tokens)
     if kind is None:
         results = trace_important_states(
