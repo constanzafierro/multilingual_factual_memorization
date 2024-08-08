@@ -101,7 +101,7 @@ def patch_ex1_into_ex2(mt, ex1, ex2, num_layers, kind, window, token_to_patch="l
     )
 
 
-def get_last_subj_token_experiment_ids(ds, ds_other):
+def get_xlingual_mem_ids(ds, ds_other):
     df = pd.DataFrame(list(ds) + list(ds_other))
     groupped = (
         df[["relation", "sub_uri", "obj_uri", "language"]]
@@ -215,10 +215,14 @@ def main(args):
             log_to_wandb=False,
         )
         id_to_ex2 = {ex["id"][: ex["id"].rfind("_")]: ex for ex in ds_other}
+        token_to_patch = args.token_to_patch
         if args.token_to_patch == "last_subject_token":
-            ids_to_patch = get_last_subj_token_experiment_ids(ds, ds_other)
+            ids_to_patch = get_xlingual_mem_ids(ds, ds_other)
         elif args.token_to_patch == "last":
             ids_to_patch = get_last_token_experiment_ids(ds, ds_other)
+        elif args.token_to_patch == "last_same_ex":
+            ids_to_patch = get_xlingual_mem_ids(ds, ds_other)
+            token_to_patch = "last"
 
         counts[f"patched_examples/{lang}"] = len(ids_to_patch)
         for ex_id_source, ex_id_target in tqdm(ids_to_patch, desc="Examples"):
@@ -233,7 +237,7 @@ def main(args):
                     mt.num_layers,
                     kind=args.kind,
                     window=args.patch_k_layers,
-                    token_to_patch=args.token_to_patch,
+                    token_to_patch=token_to_patch,
                 )
                 numpy_result = {
                     k: v.detach().cpu().numpy() if torch.is_tensor(v) else v
@@ -300,7 +304,7 @@ if __name__ == "__main__":
     parser.add_argument(
         "--token_to_patch",
         type=str,
-        choices=["last", "last_subject_token"],
+        choices=["last", "last_subject_token", "last_same_ex"],
         default=None,
     )
     args = parser.parse_args()
