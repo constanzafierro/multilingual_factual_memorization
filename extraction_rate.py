@@ -48,19 +48,19 @@ def set_act_get_hooks(
             hooks.append(
                 get_module(
                     model,
-                    layername(model=model, number=i, kind="attn", stack="decoder"),
+                    layername(model=model, num=i, kind="attn", stack="decoder"),
                 ).register_forward_hook(get_activation(f"attn_{i}"))
             )
         if hook_mlp:
             hooks.append(
                 get_module(
-                    model, layername(model=model, number=i, kind="mlp", stack="decoder")
+                    model, layername(model=model, num=i, kind="mlp", stack="decoder")
                 ).register_forward_hook(get_activation(f"mlp_{i}"))
             )
         if hook_out:
             hooks.append(
                 get_module(
-                    model, layername(model=model, number=i, kind=None, stack="decoder")
+                    model, layername(model=model, num=i, kind=None, stack="decoder")
                 ).register_forward_hook(get_activation(f"out_{i}"))
             )
 
