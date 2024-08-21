@@ -8,14 +8,12 @@ import torch
 import wandb
 from tqdm import tqdm
 from transformers import (
-    AutoModelForCausalLM,
-    AutoTokenizer,
     GPT2LMHeadModel,
     XGLMForCausalLM,
 )
 
 from dataset.data_utils import find_token_range, get_memorized_dataset
-from model_utils import load_tokenizer
+from model_utils import load_model_and_tok
 from third_party.rome.experiments.causal_trace import layername
 from third_party.rome.util.nethook import get_module
 
@@ -48,21 +46,22 @@ def set_act_get_hooks(
     for i in range(total_layers):
         if hook_attn:
             hooks.append(
-                get_module(model, layername(model, i, "attn")).register_forward_hook(
-                    get_activation(f"attn_{i}")
-                )
+                get_module(
+                    model,
+                    layername(model=model, number=i, kind="attn", stack="decoder"),
+                ).register_forward_hook(get_activation(f"attn_{i}"))
             )
         if hook_mlp:
             hooks.append(
-                get_module(model, layername(model, i, "mlp")).register_forward_hook(
-                    get_activation(f"mlp_{i}")
-                )
+                get_module(
+                    model, layername(model=model, number=i, kind="mlp", stack="decoder")
+                ).register_forward_hook(get_activation(f"mlp_{i}"))
             )
         if hook_out:
             hooks.append(
-                get_module(model, layername(model, i, None)).register_forward_hook(
-                    get_activation(f"out_{i}")
-                )
+                get_module(
+                    model, layername(model=model, number=i, kind=None, stack="decoder")
+                ).register_forward_hook(get_activation(f"out_{i}"))
             )
 
     return hooks
@@ -111,8 +110,8 @@ def main(args):
     os.makedirs(args.output_folder, exist_ok=True)
 
     device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
-    model = AutoModelForCausalLM.from_pretrained(args.model_name_or_path).to(device)
-    tokenizer = load_tokenizer(args.model_name_or_path)
+    mt = load_model_and_tok(args.model_name_or_path, args.model_name)
+    model, tokenizer = mt.model, mt.tokenizer
 
     total_layers = len(get_module(model, layername(model, kind="layers")))
     lm_head = get_module(model, layername(model, kind="lm_head")).weight
