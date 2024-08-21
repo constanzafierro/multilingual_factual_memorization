@@ -183,7 +183,7 @@ def main(args):
                         **extra_items,
                     }
                 )
-        if args.store_topk and len(records) > 500 * total_layers * len(
+        if args.store_topk and len(records) > 200 * total_layers * len(
             args.hook_modules
         ):
             df = pd.DataFrame(records)
