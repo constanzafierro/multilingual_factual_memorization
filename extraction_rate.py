@@ -129,6 +129,7 @@ def main(args):
     )
 
     records = []
+    total_records = 0
     for ex in tqdm(ds, desc="Examples"):
         text_input = ex["query_inference"]
         inp = tokenizer(text_input, return_tensors="pt").to(device)
@@ -182,6 +183,15 @@ def main(args):
                         **extra_items,
                     }
                 )
+        if args.store_topk and len(records) > 500 * total_layers * len(
+            args.hook_modules
+        ):
+            df = pd.DataFrame(records)
+            filename = f"extraction_events_{total_records}"
+            df.to_csv(os.path.join(args.output_folder, f"{filename}.csv"), index=False)
+            total_records += len(records)
+            records = []
+
     df = pd.DataFrame(records)
     filename = "extraction_events"
     df.to_csv(os.path.join(args.output_folder, f"{filename}.csv"), index=False)
