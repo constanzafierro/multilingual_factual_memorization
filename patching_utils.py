@@ -160,6 +160,6 @@ def trace_important_window(
                 r = trace_with_patch(
                     model, inp, layerlist, answer_t, tokens_to_mix=e_range, noise=noise
                 )
-                row.append(r)
+                row.append(r.detach().cpu())
             table.append(torch.stack(row))
     return torch.stack(table)
