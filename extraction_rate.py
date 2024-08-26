@@ -12,7 +12,7 @@ from transformers import (
     XGLMForCausalLM,
 )
 
-from dataset.data_utils import find_token_range, get_memorized_dataset
+from dataset.data_utils import find_token_range, get_memorized_dataset, get_dataset_name
 from model_utils import load_model_and_tok
 from third_party.rome.experiments.causal_trace import layername
 from third_party.rome.util.nethook import get_module
@@ -76,11 +76,6 @@ def main(args):
     data_id = "_".join(
         [
             args.language,
-            (
-                args.dataset_name
-                if "/" not in args.dataset_name
-                else args.dataset_name.split("/")[1]
-            ),
         ]
     )
     if args.only_subset:
@@ -116,12 +111,14 @@ def main(args):
     total_layers = len(get_module(model, layername(model, kind="layers")))
     lm_head = get_module(model, layername(model, kind="lm_head")).weight
 
+    dataset_name = get_dataset_name(args.model_name, args.language)
     ds = get_memorized_dataset(
-        args.dataset_name,
+        dataset_name,
         args.language,
         args.eval_dir,
         args.model_name,
         args.only_subset,
+        mt.tokenizer,
         args.filter_trivial,
         args.resample_trivial,
         args.keep_only_trivial,
@@ -208,12 +205,6 @@ if __name__ == "__main__":
     parser = argparse.ArgumentParser()
     parser.add_argument("--model_name_or_path", type=str, required=True)
     parser.add_argument("--model_name", type=str)
-    parser.add_argument(
-        "--dataset_name",
-        required=True,
-        type=str,
-        help="",
-    )
     parser.add_argument(
         "--eval_dir",
         type=str,
