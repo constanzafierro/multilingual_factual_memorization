@@ -532,7 +532,8 @@ def layername(model, num=-1, kind=None, stack="encoder"):
             return kind_to_layer[kind]
         kind_map = {
             "attn": "0.dropout",
-            "mlp": "1" if stack == "encoder" else "2" + ".DenseReluDense.dropout",
+            "cross_attn": "1.dropout",
+            "mlp": "1" if stack == "encoder" else "2" + ".dropout",
         }
         return (
             f'{stack}.block.{num}{"" if kind is None else ".layer." + kind_map[kind]}'

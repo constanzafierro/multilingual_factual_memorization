@@ -33,7 +33,7 @@ def get_hidden_state_from_output(model, output, tok_index, output_type):
 
 
 def set_act_get_hooks(
-    model, total_layers, tok_index, hook_attn=False, hook_mlp=False, hook_out=True
+    model, total_layers, tok_index, hook_modules=["attn", "cross_attn", "mlp", "out"]
 ):
     for attr in ["activations_"]:
         if not hasattr(model, attr):
@@ -49,24 +49,15 @@ def set_act_get_hooks(
 
     hooks = []
     for i in range(total_layers):
-        if hook_attn:
+        for module in hook_modules:
+            kind = module
+            if module == "out":
+                kind = None
             hooks.append(
                 get_module(
                     model,
-                    layername(model=model, num=i, kind="attn", stack="decoder"),
-                ).register_forward_hook(get_activation(f"attn_{i}"))
-            )
-        if hook_mlp:
-            hooks.append(
-                get_module(
-                    model, layername(model=model, num=i, kind="mlp", stack="decoder")
-                ).register_forward_hook(get_activation(f"mlp_{i}"))
-            )
-        if hook_out:
-            hooks.append(
-                get_module(
-                    model, layername(model=model, num=i, kind=None, stack="decoder")
-                ).register_forward_hook(get_activation(f"out_{i}"))
+                    layername(model=model, num=i, kind=kind, stack="decoder"),
+                ).register_forward_hook(get_activation(f"{module}_{i}"))
             )
 
     return hooks
@@ -148,9 +139,7 @@ def main(args):
             model,
             total_layers,
             last_token_index,
-            hook_mlp="mlp_" in args.hook_modules,
-            hook_attn="attn_" in args.hook_modules,
-            hook_out="out_" in args.hook_modules,
+            hook_kinds=args.hook_modules,
         )
         with torch.no_grad():
             outputs = model(**inp)
@@ -159,7 +148,7 @@ def main(args):
 
         for layer in range(total_layers):
             for k in args.hook_modules:
-                out = model.activations_[f"{k}{layer}"][0]
+                out = model.activations_[f"{k}_{layer}"][0]
                 proj = (lm_head @ out).detach().cpu().numpy()
                 ind = np.argsort(-proj, axis=-1)  # Descending order.
                 pred_tok_rank = np.where(ind == token_pred)[0][0]
@@ -228,7 +217,9 @@ if __name__ == "__main__":
     parser.add_argument("--filter_trivial", action="store_true")
     parser.add_argument("--keep_only_trivial", action="store_true")
     parser.add_argument("--resample_trivial", action="store_true")
-    parser.add_argument("--hook_modules", nargs="+", default=["attn_", "mlp_", "out_"])
+    parser.add_argument(
+        "--hook_modules", nargs="+", default=["cross_attn", "attn", "mlp", "out"]
+    )
     parser.add_argument("--store_topk", type=int)
     parser.add_argument("--output_folder", type=str, required=True)
     parser.add_argument("--last_subject_token", action="store_true")

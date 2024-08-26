@@ -130,7 +130,7 @@ def trace_important_window(
     """Copy of the function in causal_trace.ipynb"""
     table = []
     for ids_key, stack in [("input_ids", "encoder"), ("decoder_input_ids", "decoder")]:
-        if ids_key not in inp:
+        if ids_key not in inp or (kind == "cross_attn" and stack != "decoder"):
             continue
         if ntoks is None:
             ntoks = range(inp[ids_key].shape[1])

@@ -486,7 +486,12 @@ def main(args):
         )
     wandb.run.summary["noise_level"] = noise_level
     print(f"Using noise level {noise_level}")
-    for kind in [None, "mlp", "attn"]:
+    modules = (
+        [None, "mlp", "attn", "cross_attn"]
+        if hasattr(mt.model, "decoder")
+        else [None, "mlp", "attn"]
+    )
+    for kind in modules:
         print("Computing for", kind)
         if not args.only_plot_average:
             plot_hidden_flow(
