@@ -76,6 +76,7 @@ def calculate_hidden_flow(
             noise=noise,
             window=window,
             kind=kind,
+            low_score=low_score,
         )
     differences = differences.detach().cpu()
     input_ids = inp["input_ids"][0]

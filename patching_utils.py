@@ -125,18 +125,30 @@ def trace_important_states(
 
 
 def trace_important_window(
-    model, num_layers, inp, e_range, answer_t, kind, window=10, noise=0.1, ntoks=None
+    model,
+    num_layers,
+    inp,
+    e_range,
+    answer_t,
+    kind,
+    window=10,
+    noise=0.1,
+    ntoks=None,
+    low_score=None,
 ):
     """Copy of the function in causal_trace.ipynb"""
     table = []
     for ids_key, stack in [("input_ids", "encoder"), ("decoder_input_ids", "decoder")]:
-        if ids_key not in inp or (kind == "cross_attn" and stack != "decoder"):
+        if ids_key not in inp:
             continue
         if ntoks is None:
             ntoks = range(inp[ids_key].shape[1])
         for tnum in ntoks:
             row = []
             for layer in range(0, num_layers):
+                if kind == "cross_attn" and stack != "decoder":
+                    row.append(low_score)
+                    continue
                 layerlist = [
                     (tnum, layername(model, stack=stack, num=L, kind=kind))
                     for L in range(
