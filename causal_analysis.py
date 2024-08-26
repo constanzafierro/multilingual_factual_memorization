@@ -132,9 +132,13 @@ def plot_averages(
             args = {"vmin": min(ticks)}
         h = ax.pcolor(
             scores,
-            cmap={None: "Purples", "None": "Purples", "mlp": "Greens", "attn": "Reds"}[
-                kind
-            ],
+            cmap={
+                None: "Purples",
+                "None": "Purples",
+                "mlp": "Greens",
+                "attn": "Reds",
+                "cross_attn": "Blues",
+            }[kind],
             **args,
         )
         ax.invert_yaxis()
@@ -146,11 +150,10 @@ def plot_averages(
             ax.set_title("Impact of restoring state after corrupted input")
             ax.set_xlabel(f"single restored layer within {modelname}")
         else:
-            kindname = "MLP" if kind == "mlp" else "Attn"
             ax.set_title(
-                "Avg. impact of restoring {} after corrupted input".format(kindname)
+                "Avg. impact of restoring {} after corrupted input".format(kind)
             )
-            ax.set_xlabel(f"Center of interval of {window} restored {kindname} layers")
+            ax.set_xlabel(f"Center of interval of {window} restored {kind} layers")
         cb = plt.colorbar(h)
         cb.ax.set_title("p(%)={:0.3}".format(high_score), y=-0.16, fontsize=10)
         if use_min_for_vmin:
