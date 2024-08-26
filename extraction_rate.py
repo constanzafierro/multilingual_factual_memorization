@@ -129,6 +129,9 @@ def main(args):
     for ex in tqdm(ds, desc="Examples"):
         text_input = ex["query_inference"]
         inp = tokenizer(text_input, return_tensors="pt").to(device)
+        if ex["decoder_input_ids"] is not None:
+            decoder_input_ids = torch.tensor([ex["decoder_input_ids"]]).to(device)
+            inp = {**inp, "decoder_input_ids": decoder_input_ids}
         last_token_index = inp["input_ids"].shape[1] - 1
         if args.last_subject_token:
             subj_range = find_token_range(
