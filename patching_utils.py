@@ -137,13 +137,14 @@ def trace_important_window(
     low_score=None,
 ):
     """Copy of the function in causal_trace.ipynb"""
+    tokens_to_patch = ntoks
     table = []
     for ids_key, stack in [("input_ids", "encoder"), ("decoder_input_ids", "decoder")]:
         if ids_key not in inp:
             continue
         if ntoks is None:
-            ntoks = range(inp[ids_key].shape[1])
-        for tnum in ntoks:
+            tokens_to_patch = range(inp[ids_key].shape[1])
+        for tnum in tokens_to_patch:
             row = []
             for layer in range(0, num_layers):
                 if kind == "cross_attn" and stack != "decoder":
