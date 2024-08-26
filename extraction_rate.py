@@ -7,10 +7,7 @@ import pandas as pd
 import torch
 import wandb
 from tqdm import tqdm
-from transformers import (
-    GPT2LMHeadModel,
-    XGLMForCausalLM,
-)
+from transformers import GPT2LMHeadModel, XGLMForCausalLM, MT5ForConditionalGeneration
 
 from dataset.data_utils import find_token_range, get_memorized_dataset, get_dataset_name
 from model_utils import load_model_and_tok
@@ -24,7 +21,15 @@ def get_hidden_state_from_output(model, output, tok_index, output_type):
             # This output is a tuple.
             output = output[0]
         return output[:, tok_index].detach()
-    raise LookupError("Add {} to lookup.".format(type(model)))
+    elif isinstance(model, MT5ForConditionalGeneration):
+        if output_type.startswith("out"):
+            # The first position of the output tuple contains the hidden
+            output = output[0]
+        return output[:, tok_index].detach()
+    raise LookupError(
+        "Add condition for {} to obtain the hidden state from the output of the"
+        "module.".format(type(model))
+    )
 
 
 def set_act_get_hooks(
@@ -129,10 +134,11 @@ def main(args):
     for ex in tqdm(ds, desc="Examples"):
         text_input = ex["query_inference"]
         inp = tokenizer(text_input, return_tensors="pt").to(device)
+        last_token_index = inp["input_ids"].shape[1] - 1
         if ex["decoder_input_ids"] is not None:
             decoder_input_ids = torch.tensor([ex["decoder_input_ids"]]).to(device)
             inp = {**inp, "decoder_input_ids": decoder_input_ids}
-        last_token_index = inp["input_ids"].shape[1] - 1
+            last_token_index = inp["decoder_input_ids"].shape[1] - 1
         if args.last_subject_token:
             subj_range = find_token_range(
                 tokenizer, inp["input_ids"][0], ex["sub_label"], text_input
