@@ -591,9 +591,13 @@ def plot_trace_heatmap(result, savepdf=None, title=None, xlabel=None, modelname=
         fig, ax = plt.subplots(figsize=(3.5, 2), dpi=200)
         h = ax.pcolor(
             differences,
-            cmap={None: "Purples", "None": "Purples", "mlp": "Greens", "attn": "Reds"}[
-                kind
-            ],
+            cmap={
+                None: "Purples",
+                "None": "Purples",
+                "mlp": "Greens",
+                "attn": "Reds",
+                "cross_attn": "Blues",
+            }[kind],
             vmin=low_score,
         )
         ax.invert_yaxis()
@@ -607,9 +611,8 @@ def plot_trace_heatmap(result, savepdf=None, title=None, xlabel=None, modelname=
             ax.set_title("Impact of restoring state after corrupted input")
             ax.set_xlabel(f"single restored layer within {modelname}")
         else:
-            kindname = "MLP" if kind == "mlp" else "Attn"
-            ax.set_title(f"Impact of restoring {kindname} after corrupted input")
-            ax.set_xlabel(f"center of interval of {window} restored {kindname} layers")
+            ax.set_title(f"Impact of restoring {kind} after corrupted input")
+            ax.set_xlabel(f"center of interval of {window} restored {kind} layers")
         cb = plt.colorbar(h)
         if title is not None:
             ax.set_title(title)
