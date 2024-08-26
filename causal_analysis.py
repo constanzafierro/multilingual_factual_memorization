@@ -487,7 +487,7 @@ def main(args):
     wandb.run.summary["noise_level"] = noise_level
     print(f"Using noise level {noise_level}")
     modules = (
-        [None, "mlp", "attn", "cross_attn"]
+        ["cross_attn", None, "mlp", "attn"]
         if hasattr(mt.model, "decoder")
         else [None, "mlp", "attn"]
     )
