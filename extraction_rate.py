@@ -139,7 +139,7 @@ def main(args):
             model,
             total_layers,
             last_token_index,
-            hook_kinds=args.hook_modules,
+            hook_modules=args.hook_modules,
         )
         with torch.no_grad():
             outputs = model(**inp)
