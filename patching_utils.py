@@ -147,7 +147,7 @@ def trace_important_window(
             row = []
             for layer in range(0, num_layers):
                 if kind == "cross_attn" and stack != "decoder":
-                    row.append(low_score)
+                    row.append(torch.tensor(low_score))
                     continue
                 layerlist = [
                     (tnum, layername(model, stack=stack, num=L, kind=kind))
