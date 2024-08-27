@@ -1,15 +1,16 @@
 import argparse
 import json
 import os
+import shutil
 
 import numpy as np
 import pandas as pd
 import torch
 import wandb
 from tqdm import tqdm
-from transformers import GPT2LMHeadModel, XGLMForCausalLM, MT5ForConditionalGeneration
+from transformers import GPT2LMHeadModel, MT5ForConditionalGeneration, XGLMForCausalLM
 
-from dataset.data_utils import find_token_range, get_memorized_dataset, get_dataset_name
+from dataset.data_utils import find_token_range, get_dataset_name, get_memorized_dataset
 from model_utils import load_model_and_tok
 from third_party.rome.experiments.causal_trace import layername
 from third_party.rome.util.nethook import get_module
@@ -32,9 +33,7 @@ def get_hidden_state_from_output(model, output, tok_index, output_type):
     )
 
 
-def set_act_get_hooks(
-    model, total_layers, tok_index, hook_modules=["attn", "cross_attn", "mlp", "out"]
-):
+def set_act_get_hooks(model, total_layers, tok_index, hook_modules):
     for attr in ["activations_"]:
         if not hasattr(model, attr):
             setattr(model, attr, {})
@@ -121,7 +120,7 @@ def main(args):
     )
 
     records = []
-    total_records = 0
+    tmp_stored_records = []
     for ex in tqdm(ds, desc="Examples"):
         text_input = ex["query_inference"]
         inp = tokenizer(text_input, return_tensors="pt").to(device)
@@ -135,6 +134,12 @@ def main(args):
                 tokenizer, inp["input_ids"][0], ex["sub_label"], text_input
             )
             last_token_index = subj_range[1] - 1
+        if not args.hook_modules:
+            args.hook_modules = (
+                ["cross_attn", None, "mlp", "attn"]
+                if hasattr(model, "decoder")
+                else [None, "mlp", "attn"]
+            )
         hooks = set_act_get_hooks(
             model,
             total_layers,
@@ -181,14 +186,23 @@ def main(args):
             args.hook_modules
         ):
             df = pd.DataFrame(records)
-            filename = f"extraction_events_{total_records}"
-            df.to_csv(os.path.join(args.output_folder, f"{filename}.csv"), index=False)
-            total_records += len(records)
+            filename = os.path.join(
+                args.output_folder,
+                "tmp",
+                f"extraction_events_{len(tmp_stored_records)}.csv",
+            )
+            df.to_csv(filename, index=False)
+            tmp_stored_records.append(filename)
             records = []
+    filename = os.path.join(
+        args.output_folder, "tmp", f"extraction_events_{len(tmp_stored_records)}.csv"
+    )
+    pd.DataFrame(records).to_csv(filename, index=False)
+    tmp_stored_records.append(filename)
 
-    df = pd.DataFrame(records)
-    filename = "extraction_events"
-    df.to_csv(os.path.join(args.output_folder, f"{filename}.csv"), index=False)
+    df = pd.concat([pd.read_csv(f) for f in tmp_stored_records])
+    df.to_csv(os.path.join(args.output_folder, "extraction_events.csv"), index=False)
+    shutil.rmtree(os.path.join(args.output_folder, "tmp"))
     with open(os.path.join(args.output_folder, "args.json"), "w") as f:
         json.dump(args.__dict__, f, indent=2)
     df[["proj_vec", "language", "relation", "layer", "pred_in_top_1"]].groupby(
@@ -217,9 +231,7 @@ if __name__ == "__main__":
     parser.add_argument("--filter_trivial", action="store_true")
     parser.add_argument("--keep_only_trivial", action="store_true")
     parser.add_argument("--resample_trivial", action="store_true")
-    parser.add_argument(
-        "--hook_modules", nargs="+", default=["cross_attn", "attn", "mlp", "out"]
-    )
+    parser.add_argument("--hook_modules", nargs="+")
     parser.add_argument("--store_topk", type=int)
     parser.add_argument("--output_folder", type=str, required=True)
     parser.add_argument("--last_subject_token", action="store_true")
