@@ -205,7 +205,9 @@ def agg_causal_analysis_results(tokenizer, ds, cache_output_dir, kind):
             encoder_scores = numpy_result["scores"][: -len(decoder_input_ids)]
             decoder_scores = numpy_result["scores"][len(encoder_scores) :]
             decoder_input_ids = input_ids[len(encoder_scores) :]
-            assert np.all(ex["decoder_input_ids"] == decoder_input_ids), f"{ex['id']}_{kind}"
+            assert np.all(
+                ex["decoder_input_ids"] == decoder_input_ids
+            ), f"{ex['id']}_{kind}"
             input_ids = input_ids[: len(encoder_scores)]
 
         ex_scores = collections.defaultdict(list)
@@ -376,13 +378,20 @@ def plot_hidden_flow(
     kind,
     noise_level,
     patch_k_layers,
-    recompute_query_inference=False,
+    override=False,
 ):
     for ex in tqdm(ds, desc="Examples"):
         ex_id = ex["id"]
         filename = os.path.join(cache_output_dir, f"{ex_id}{kind}.npz")
+        if os.path.file(filename):
+            numpy_result = np.load(filename, allow_pickle=True)
         if not os.path.isfile(filename) or (
-            recompute_query_inference and ex["query_inference"] != ex["query"]
+            override
+            and "decoder_input_ids" in ex
+            and not np.all(
+                ex["decoder_input_ids"]
+                == numpy_result["input_ids"][: -len(ex["decoder_input_ids"])]
+            )
         ):
             result = calculate_hidden_flow(
                 mt,
@@ -398,8 +407,6 @@ def plot_hidden_flow(
                 for k, v in result.items()
             }
             np.savez(filename, **numpy_result)
-        else:
-            numpy_result = np.load(filename, allow_pickle=True)
         plot_result = dict(numpy_result)
         plot_result["kind"] = kind
         pdfname = os.path.join(
@@ -507,7 +514,7 @@ def main(args):
                 kind,
                 noise_level,
                 args.patch_k_layers,
-                recompute_query_inference=args.recompute_query_inference,
+                override=args.override,
             )
         plot_average_trace_heatmap(
             ds,
@@ -560,7 +567,7 @@ if __name__ == "__main__":
     parser.add_argument("--only_subset", action="store_true")
     parser.add_argument("--override_noise_level", type=float, help="")
     parser.add_argument("--only_plot_average", action="store_true")
-    parser.add_argument("--recompute_query_inference", action="store_true")
+    parser.add_argument("--override", action="store_true")
     parser.add_argument("--filter_trivial", action="store_true")
     parser.add_argument("--keep_only_trivial", action="store_true")
     parser.add_argument("--resample_trivial", action="store_true")
