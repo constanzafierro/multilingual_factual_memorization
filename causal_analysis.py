@@ -205,6 +205,7 @@ def agg_causal_analysis_results(tokenizer, ds, cache_output_dir, kind):
             encoder_scores = numpy_result["scores"][: -len(decoder_input_ids)]
             decoder_scores = numpy_result["scores"][len(encoder_scores) :]
             decoder_input_ids = input_ids[len(encoder_scores) :]
+            assert ex["decoder_input_ids"] == decoder_input_ids, f"{ex['id']}_{kind}"
             input_ids = input_ids[: len(encoder_scores)]
 
         ex_scores = collections.defaultdict(list)

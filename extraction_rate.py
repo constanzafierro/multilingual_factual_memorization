@@ -115,9 +115,9 @@ def main(args):
         args.model_name,
         args.only_subset,
         mt.tokenizer,
-        args.filter_trivial,
-        args.resample_trivial,
-        args.keep_only_trivial,
+        filter_trivial=args.filter_trivial,
+        resample_trivial=args.resample_trivial,
+        keep_only_trivial=args.keep_only_trivial,
     )
 
     records = []
