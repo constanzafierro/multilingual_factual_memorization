@@ -194,13 +194,18 @@ def main(args):
             df.to_csv(filename, index=False)
             tmp_stored_records.append(filename)
             records = []
-    filename = os.path.join(
-        args.output_folder, "tmp", f"extraction_events_{len(tmp_stored_records)}.csv"
-    )
-    pd.DataFrame(records).to_csv(filename, index=False)
-    tmp_stored_records.append(filename)
 
-    df = pd.concat([pd.read_csv(f) for f in tmp_stored_records])
+    if args.store_topk:
+        filename = os.path.join(
+            args.output_folder,
+            "tmp",
+            f"extraction_events_{len(tmp_stored_records)}.csv",
+        )
+        pd.DataFrame(records).to_csv(filename, index=False)
+        tmp_stored_records.append(filename)
+        df = pd.concat([pd.read_csv(f) for f in tmp_stored_records])
+    else:
+        df = pd.DataFrame(records)
     df.to_csv(os.path.join(args.output_folder, "extraction_events.csv"), index=False)
     shutil.rmtree(os.path.join(args.output_folder, "tmp"))
     with open(os.path.join(args.output_folder, "args.json"), "w") as f:
