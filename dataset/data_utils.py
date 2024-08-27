@@ -132,11 +132,7 @@ def add_exact_query(example, memorized_df, df_id_to_index):
     else:
         if start_index != 0:
             try:
-                example["query_inference"] = (
-                    example["query"].strip()
-                    + " "
-                    + row["prediction"][:start_index].strip()
-                )
+                example["query_inference"] = row["raw_prediction"][:start_index].strip()
                 example["decoder_input_ids"] = None
 
             except Exception as e:
@@ -189,6 +185,12 @@ def log_trivial_examples_counts(memorized_df, ds):
     )
 
 
+def remove_special_tokens_from_str(text, tokenizer):
+    return tokenizer.decode(
+        tokenizer(text, add_special_tokens=False)["input_ids"], skip_special_tokens=True
+    )
+
+
 def _get_memorized_ds(dataset_name, eval_df_filename, tokenizer):
     inference_df = pd.read_json(eval_df_filename)
     memorized_df = inference_df[inference_df.exact_match].copy()
@@ -221,8 +223,18 @@ def _get_memorized_ds(dataset_name, eval_df_filename, tokenizer):
             axis=1,
         )
     else:
+        memorized_df["raw_prediction"] = memorized_df.apply(
+            lambda ex: remove_special_tokens_from_str(
+                ex["raw_pred_with_special_tokens"]
+            ),
+            axis=1,
+        )
         memorized_df["start_answer"] = memorized_df.apply(
-            lambda ex: get_start_ans_idx(ex["prediction"], ex["ground_truth"]), axis=1
+            lambda ex: get_start_ans_idx(
+                ex["raw_prediction"],
+                ex["ground_truth"],
+            ),
+            axis=1,
         )
     if len(memorized_df[memorized_df.start_answer.isnull()]) > 0:
         none_values = memorized_df[memorized_df.start_answer.isnull()]

@@ -66,20 +66,21 @@ def load_sentinel_prediction(data_path, return_raw_ans=False):
             sentinel_index, pred = re_split[1], re_split[2]
             assert sentinel_index == "0", answer
             id_to_preds[data["example_id"]] = pred
-            if return_raw_ans:
-                output_ids = data["predictions"][0]["output_ids"]
-                assert output_ids[:2] == [0, 250099]
-                id_to_preds[data["example_id"]] = data["predictions"][0]["answer"]
     return id_to_preds
 
 
-def add_raw_prediction(df, predictions_path):
-    id_to_pred_prefixes = load_sentinel_prediction(
-        predictions_path, return_raw_ans=True
+def add_raw_prediction(df, predictions_path, decoder_key):
+    id_to_preds = {}
+    with open(os.path.join(predictions_path, "raw_predictions.json")) as fhandle:
+        for line in fhandle:
+            data = json.loads(line)
+            id_to_preds[data["example_id"]] = data["predictions"][0]["answer"]
+    key = (
+        "decoder_pred_with_special_tokens"
+        if decoder_key
+        else "raw_pred_with_special_tokens"
     )
-    df["decoder_pred_with_special_tokens"] = df.apply(
-        lambda row: id_to_pred_prefixes[row["id"]], axis=1
-    )
+    df[key] = df.apply(lambda row: id_to_preds[row["id"]], axis=1)
     return df
 
 
@@ -129,8 +130,9 @@ def main(args):
     else:
         id_to_prediction = load_predictions(args.predictions_path)
     df, scores = evaluate(dataset, id_to_prediction, langs=args.langs)
-    if args.use_sentinel_prediction:
-        df = add_raw_prediction(df, args.predictions_path)
+    df = add_raw_prediction(
+        df, args.predictions_path, decoder_key=args.use_sentinel_prediction
+    )
     wandb.log({k: v for k, v in scores.items() if not isinstance(v, list)})
     df.to_json(
         os.path.join(experiment_dir, "eval_per_example_records.json"), orient="records"
