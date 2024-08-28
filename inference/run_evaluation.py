@@ -6,6 +6,7 @@ import wandb
 from datasets import load_dataset
 from inference.f1_score import compute_score
 import re
+import collections
 from glob import glob
 from dataset.pararel_utils import OBJECT_KEY
 from dataset.data_utils import log_trivial_examples_counts, get_dataset_name
@@ -14,16 +15,20 @@ from dataset.data_utils import log_trivial_examples_counts, get_dataset_name
 def evaluate(dataset, id_to_prediction, language):
     # compute F1 as max across any alias for any answer for the most recent, most frequent, or specific-year answer
     qa_targets, qa_predictions = [], []
-    num_empty = 0
+    counts = collections.defaultdict(int)
     dataset = dataset.filter(lambda ex: ex["language"] == language)
     for example in dataset:
         query_id = example["id"]
+        if query_id not in id_to_prediction:
+            counts["missing_ids"] += 1
+            continue
+
         targets = example[OBJECT_KEY]
         targets = targets if isinstance(targets, list) else [targets]
         prediction = id_to_prediction[query_id]
 
         if not len(prediction):
-            num_empty += 1
+            counts["empty_preds"] += 1
             continue
 
         qa_targets.append(
@@ -35,9 +40,9 @@ def evaluate(dataset, id_to_prediction, language):
         qa_predictions.append({"prediction_text": prediction, "id": query_id})
 
     print("Evaluating on {} datapoints".format(len(qa_targets)))
-    print("Num empty", num_empty)
+    print("Num empty", counts["empty_preds"])
     df, scores = compute_score(predictions=qa_predictions, references=qa_targets)
-    return df, {"n_datapoints": len(qa_targets), "empty_preds": num_empty, **scores}
+    return df, {"n_datapoints": len(qa_targets), **counts, **scores}
 
 
 def load_predictions(data_path):
