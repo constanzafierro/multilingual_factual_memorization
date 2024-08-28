@@ -251,25 +251,30 @@ def _get_memorized_ds(dataset_name, eval_df_filename, tokenizer):
             axis=1,
         )
         memorized_df["start_answer"] = memorized_df.apply(
-            lambda row: len(row["input_ids_decoded"])
-            + get_start_ans_idx(
+            # Note that we need to add the length of "input_ids_decoded" to the
+            # start_answer but we can't do it before removing the examples for
+            # which get_start_ans_idx is None.
+            lambda row: get_start_ans_idx(
                 row["raw_pred_with_special_tokens"][len(row["input_ids_decoded"]) :],
                 row["ground_truth"],
             ),
             axis=1,
         )
-    if len(memorized_df[memorized_df.start_answer.isnull()]) > 0:
-        none_values = memorized_df[memorized_df.start_answer.isnull()]
-        print(
-            "Could not find the answer in the prediction for {} examples. "
-            "Data taken from: eval_df_filename={}, dataset_name={}".format(
-                len(none_values), eval_df_filename, dataset_name
+        if len(memorized_df[memorized_df.start_answer.isnull()]) > 0:
+            none_values = memorized_df[memorized_df.start_answer.isnull()]
+            print(
+                "Could not find the answer in the prediction for {} examples. "
+                "Data taken from: eval_df_filename={}, dataset_name={}".format(
+                    len(none_values), eval_df_filename, dataset_name
+                )
             )
+            if wandb.run is not None:
+                wandb.run.summary["answer_not_found"] = len(none_values)
+            memorized_df = memorized_df[~memorized_df.start_answer.isnull()]
+            ds = ds.filter(lambda ex: ex["id"] in set(memorized_df["id"].values))
+        memorized_df["start_answer"] = memorized_df.apply(
+            lambda row: row["start_answer"] + len(row["input_ids_decoded"])
         )
-        if wandb.run is not None:
-            wandb.run.summary["answer_not_found"] = len(none_values)
-        memorized_df = memorized_df[~memorized_df.start_answer.isnull()]
-        ds = ds.filter(lambda ex: ex["id"] in set(memorized_df["id"].values))
     df_id_to_index = {id_: i for i, id_ in enumerate(memorized_df.id.values)}
     ds = ds.map(
         partial(
