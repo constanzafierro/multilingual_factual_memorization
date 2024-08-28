@@ -116,17 +116,16 @@ def compute_metrics(df):
 
 def main(args):
     dataset_name = get_dataset_name(args.model_name, args.language)
-    predictions_path = glob(
-        os.path.join(
-            args.predictions_folder,
-            args.language,
-            "*",
-            dataset_name,
-            "--",
-            args.model_name.replace("/", "__"),
-        )
+    pattern = os.path.join(
+        args.predictions_folder,
+        args.language,
+        "*",
+        dataset_name,
+        "--",
+        args.model_name.replace("/", "__"),
     )
-    assert len(predictions_path) == 1, predictions_path
+    predictions_path = glob(pattern)
+    assert len(predictions_path) == 1, pattern
     predictions_path = predictions_path[0]
     experiment_dir = os.path.join(args.output_dir, os.path.basename(predictions_path))
     if args.use_sentinel_prediction:
