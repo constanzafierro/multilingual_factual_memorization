@@ -1,29 +1,27 @@
 import argparse
 import collections
 import os
-from collections import defaultdict
 
 import matplotlib.pyplot as plt
 import numpy as np
 import torch
 import wandb
 from tqdm import tqdm
-from dataset.data_utils import get_memorized_dataset, find_token_range
-from inference.run_inference import prepare_prompt
-from third_party.rome.experiments.causal_trace import (
-    collect_embedding_std,
-    decode_tokens,
-    layername,
-    plot_trace_heatmap,
-    predict_from_input,
-    predict_token,
-)
-from model_utils import load_model_and_tok
 from transformers import T5TokenizerFast
+
+from dataset.data_utils import find_token_range, get_memorized_dataset
+from model_utils import load_model_and_tok
 from patching_utils import (
     trace_important_states,
     trace_important_window,
     trace_with_patch,
+)
+from third_party.rome.experiments.causal_trace import (
+    collect_embedding_std,
+    decode_tokens,
+    plot_trace_heatmap,
+    predict_from_input,
+    predict_token,
 )
 
 torch.set_grad_enabled(False)
@@ -32,6 +30,7 @@ torch.set_grad_enabled(False)
 def calculate_hidden_flow(
     mt,
     prompt,
+    input_ids,
     subject,
     decoder_input_ids=None,
     noise=0.1,
@@ -46,10 +45,10 @@ def calculate_hidden_flow(
     and returns a dictionary numerically summarizing the results.
     """
     device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
-    prompt = prepare_prompt(prompt, args.model_name_or_path, "", "t5" in mt.model_name)
-    inp = mt.tokenizer([prompt for _ in range(samples + 1)], return_tensors="pt").to(
-        device
-    )
+    inp = {
+        "input_ids": torch.tensor([input_ids for _ in range(samples + 1)]).to(device),
+    }
+    inp["attention_mask"] = torch.ones_like(inp["input_ids"])
     if decoder_input_ids is not None:
         decoder_input_ids = torch.tensor(
             [decoder_input_ids for _ in range(samples + 1)]
@@ -372,17 +371,14 @@ def plot_average_trace_heatmap(
         )
 
 
-def input_ids_match(tokenizer, ex, numpy_result):
-    if "decoder_input_ids" in ex:
+def input_ids_match(ex, numpy_result):
+    if ex["decoder_input_ids"] is not None:
         decoder_input_ids = numpy_result["input_ids"][: -len(ex["decoder_input_ids"])]
         input_ids = numpy_result["input_ids"][: len(ex["decoder_input_ids"])]
         return np.all(ex["decoder_input_ids"] == decoder_input_ids) and np.all(
             ex["input_ids"] == input_ids
         )
-    return (
-        tokenizer.decode(numpy_result["input_ids"], skip_special_tokens=True)
-        == ex["query_inference"]
-    )
+    return np.all(numpy_result["input_ids"] == ex["input_ids"])
 
 
 def plot_hidden_flow(
@@ -398,16 +394,17 @@ def plot_hidden_flow(
     for ex in tqdm(ds, desc="Examples"):
         ex_id = ex["id"]
         filename = os.path.join(cache_output_dir, f"{ex_id}{kind}.npz")
-        if os.path.file(filename):
+        if os.path.isfile(filename):
             numpy_result = np.load(filename, allow_pickle=True)
         if not os.path.isfile(filename) or (
-            override and not input_ids_match(mt.tokenizer, ex, numpy_result)
+            override and not input_ids_match(ex, numpy_result)
         ):
             result = calculate_hidden_flow(
-                mt,
-                ex["query_inference"],
-                ex["sub_label"],
-                ex["decoder_input_ids"],
+                mt=mt,
+                prompt=ex["query_inference"],
+                input_ids=ex["input_ids"],
+                subject=ex["sub_label"],
+                decoder_input_ids=ex["decoder_input_ids"],
                 noise=noise_level,
                 kind=kind,
                 window=patch_k_layers,

@@ -123,7 +123,8 @@ def main(args):
     tmp_stored_records = []
     for ex in tqdm(ds, desc="Examples"):
         text_input = ex["query_inference"]
-        inp = tokenizer(text_input, return_tensors="pt").to(device)
+        inp = {"input_ids": torch.tensor([ex["input_ids"]]).to(device)}
+        inp["attention_mask"] = torch.ones_like(inp["input_ids"])
         last_token_index = inp["input_ids"].shape[1] - 1
         if ex["decoder_input_ids"] is not None:
             decoder_input_ids = torch.tensor([ex["decoder_input_ids"]]).to(device)

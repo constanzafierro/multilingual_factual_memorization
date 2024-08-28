@@ -11,7 +11,6 @@ import wandb
 from tqdm import tqdm
 
 from dataset.data_utils import find_token_range, get_dataset_name, get_memorized_dataset
-from inference.run_inference import prepare_prompt
 from model_utils import load_model_and_tok
 from patching_utils import trace_important_states, trace_important_window
 from third_party.rome.experiments.causal_trace import (
@@ -39,10 +38,7 @@ def patch_ex1_into_ex2(mt, ex1, ex2, num_layers, kind, window, token_to_patch="l
     device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
     input_prompts = []
     for ex in [ex1, ex2]:
-        prompt = ex["query_inference"]
-        input_prompts.append(
-            prepare_prompt(prompt, args.model_name_or_path, "", "t5" in mt.model_name)
-        )
+        input_prompts.append(ex["query_inference"])
     mt.tokenizer.padding_side = "left"
     inp = mt.tokenizer(input_prompts, return_tensors="pt", padding=True).to(device)
     token_idx_to_patch_from, token_idx_to_patch = get_token_indices(

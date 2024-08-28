@@ -1,21 +1,21 @@
 import argparse
 import functools
+import json
 import os
 
 import pandas as pd
 import torch
 import wandb
 from tqdm import tqdm
-from inference.run_inference import prepare_prompt
-import json
-from third_party.rome.experiments.causal_trace import layername
-from third_party.rome.util.nethook import get_module
-from dataset.data_utils import find_token_range, get_memorized_dataset, get_dataset_name
+
+from dataset.data_utils import find_token_range, get_dataset_name, get_memorized_dataset
 from model_utils import load_model_and_tok
 from third_party.rome.experiments.causal_trace import (
     decode_tokens,
+    layername,
     predict_from_input,
 )
+from third_party.rome.util.nethook import get_module
 
 
 def remove_wrapper(model, hooks):
@@ -156,13 +156,11 @@ def main(args):
     results = []
     for ex in tqdm(ds, desc="Examples"):
         ex_id = ex["id"]
-        prompt = ex["query_inference"]
+        input_prompt = ex["query_inference"]
         subject = ex["sub_label"]
+        inp = {"input_ids": torch.tensor([ex["input_ids"]]).to(device)}
+        inp["attention_mask"] = torch.ones_like(inp["input_ids"])
 
-        input_prompt = prepare_prompt(
-            prompt, args.model_name_or_path, "", "t5" in mt.model_name
-        )
-        inp = mt.tokenizer(input_prompt, return_tensors="pt").to(device)
         e_range = find_token_range(
             mt.tokenizer, inp["input_ids"][0], subject, input_prompt
         )
