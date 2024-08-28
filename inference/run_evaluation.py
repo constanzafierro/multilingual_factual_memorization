@@ -11,13 +11,11 @@ from dataset.pararel_utils import OBJECT_KEY
 from dataset.data_utils import log_trivial_examples_counts, get_dataset_name
 
 
-def evaluate(dataset, id_to_prediction, langs):
+def evaluate(dataset, id_to_prediction, language):
     # compute F1 as max across any alias for any answer for the most recent, most frequent, or specific-year answer
     qa_targets, qa_predictions = [], []
     num_empty = 0
-    if langs:
-        langs = set(langs)
-        dataset = dataset.filter(lambda ex: ex["language"] in langs)
+    dataset = dataset.filter(lambda ex: ex["language"] == language)
     for example in dataset:
         query_id = example["id"]
         targets = example[OBJECT_KEY]
@@ -52,7 +50,7 @@ def load_predictions(data_path):
     return id_to_preds
 
 
-def load_sentinel_prediction(data_path, return_raw_ans=False):
+def load_sentinel_prediction(data_path):
     id_to_preds = {}
     with open(os.path.join(data_path, "raw_predictions.json")) as fhandle:
         for line in fhandle:
@@ -137,6 +135,7 @@ def main(args):
     if not os.path.exists(experiment_dir):
         os.makedirs(experiment_dir)
     wandb.config["final_dir"] = experiment_dir
+    wandb.config["predictions_path"] = predictions_path
 
     dataset = load_dataset(dataset_name)["train"]
     if args.use_sentinel_prediction:
