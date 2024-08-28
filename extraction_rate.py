@@ -150,6 +150,7 @@ def main(args):
             outputs = model(**inp)
         remove_hooks(hooks)
         token_pred = torch.argmax(outputs.logits[0, -1, :]).item()
+        assert ex["prediction"].startswith(tokenizer.decode(token_pred)), ex["id"]
 
         for layer in range(total_layers):
             for k in args.hook_modules:

@@ -116,7 +116,7 @@ def get_start_ans_idx(pred, gt_list, ignore_from_punctuation=0):
     return start_idx
 
 
-def add_exact_query(example, memorized_df, df_id_to_index):
+def add_exact_query_and_prediction(example, memorized_df, df_id_to_index, tokenizer):
     row = memorized_df.iloc[df_id_to_index[example["id"]]]
     start_index = int(row["start_answer"].item())
     if "decoder_pred_with_special_tokens" in memorized_df.columns:
@@ -129,10 +129,14 @@ def add_exact_query(example, memorized_df, df_id_to_index):
             if start_index >= from_ and start_index < to:
                 ans_first_token_idx = i
         example["decoder_input_ids"] = decoder_tokens["input_ids"][:ans_first_token_idx]
+        example["prediction"] = tokenizer.decode(
+            decoder_tokens["input_ids"][ans_first_token_idx:]
+        )
     else:
         if start_index != 0:
             try:
                 example["query_inference"] = row["raw_prediction"][:start_index].strip()
+                example["prediction"] = row["raw_prediction"][start_index:].strip()
                 example["decoder_input_ids"] = None
 
             except Exception as e:
@@ -144,7 +148,7 @@ def add_exact_query(example, memorized_df, df_id_to_index):
         else:
             example["query_inference"] = example["query"]
             example["decoder_input_ids"] = None
-    example["prediction"] = row["prediction"]
+            example["prediction"] = row["prediction"]
     return example
 
 
@@ -251,7 +255,10 @@ def _get_memorized_ds(dataset_name, eval_df_filename, tokenizer):
     df_id_to_index = {id_: i for i, id_ in enumerate(memorized_df.id.values)}
     ds = ds.map(
         partial(
-            add_exact_query, memorized_df=memorized_df, df_id_to_index=df_id_to_index
+            add_exact_query_and_prediction,
+            memorized_df=memorized_df,
+            df_id_to_index=df_id_to_index,
+            tokenizer=tokenizer,
         )
     )
     return ds

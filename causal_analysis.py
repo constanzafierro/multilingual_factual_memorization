@@ -38,6 +38,7 @@ def calculate_hidden_flow(
     window=10,
     kind=None,
     samples=10,
+    expected_ans=None,
 ):
     """
     Copy of the function in causal_trace.ipynb
@@ -57,6 +58,7 @@ def calculate_hidden_flow(
     with torch.no_grad():
         answer_t, base_score = [d[0] for d in predict_from_input(mt.model, inp)]
     [answer] = decode_tokens(mt.tokenizer, [answer_t])
+    assert answer.startswith(expected_ans), f"{prompt}, {answer}, {expected_ans}"
     e_range = find_token_range(mt.tokenizer, inp["input_ids"][0], subject, prompt)
     # Add noise and make a forward pass.
     low_score = trace_with_patch(
@@ -370,6 +372,19 @@ def plot_average_trace_heatmap(
         )
 
 
+def input_ids_match(tokenizer, ex, numpy_result):
+    if "decoder_input_ids" in ex:
+        decoder_input_ids = numpy_result["input_ids"][: -len(ex["decoder_input_ids"])]
+        input_ids = numpy_result["input_ids"][: len(ex["decoder_input_ids"])]
+        return np.all(ex["decoder_input_ids"] == decoder_input_ids) and np.all(
+            ex["input_ids"] == input_ids
+        )
+    return (
+        tokenizer.decode(numpy_result["input_ids"], skip_special_tokens=True)
+        == ex["query_inference"]
+    )
+
+
 def plot_hidden_flow(
     mt,
     ds,
@@ -386,12 +401,7 @@ def plot_hidden_flow(
         if os.path.file(filename):
             numpy_result = np.load(filename, allow_pickle=True)
         if not os.path.isfile(filename) or (
-            override
-            and "decoder_input_ids" in ex
-            and not np.all(
-                ex["decoder_input_ids"]
-                == numpy_result["input_ids"][: -len(ex["decoder_input_ids"])]
-            )
+            override and not input_ids_match(mt.tokenizer, ex, numpy_result)
         ):
             result = calculate_hidden_flow(
                 mt,
@@ -401,6 +411,7 @@ def plot_hidden_flow(
                 noise=noise_level,
                 kind=kind,
                 window=patch_k_layers,
+                expected_ans=ex["prediction"],
             )
             numpy_result = {
                 k: v.detach().cpu().numpy() if torch.is_tensor(v) else v
