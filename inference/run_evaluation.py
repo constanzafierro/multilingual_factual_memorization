@@ -143,7 +143,7 @@ def main(args):
         wandb.run.name += " sentinel_prediction"
     else:
         id_to_prediction = load_predictions(predictions_path)
-    df, scores = evaluate(dataset, id_to_prediction, langs=args.language)
+    df, scores = evaluate(dataset, id_to_prediction, args.language)
     df = add_raw_prediction(
         df, predictions_path, decoder_key=args.use_sentinel_prediction
     )
