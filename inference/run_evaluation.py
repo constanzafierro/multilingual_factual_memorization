@@ -135,7 +135,7 @@ def main(args):
         os.makedirs(experiment_dir)
     wandb.config["final_dir"] = experiment_dir
 
-    dataset = load_dataset(args.dataset_name)["train"]
+    dataset = load_dataset(dataset_name)["train"]
     if args.use_sentinel_prediction:
         id_to_prediction = load_sentinel_prediction(predictions_path)
         wandb.run.name += " sentinel_prediction"
@@ -155,12 +155,6 @@ def main(args):
 
 if __name__ == "__main__":
     parser = argparse.ArgumentParser(description="Evaluation")
-    parser.add_argument(
-        "--dataset_name",
-        type=str,
-        default="coastalcph/xlingual_mpararel",
-        help="",
-    )
     parser.add_argument("--model_name", type=str)
     parser.add_argument("--language", type=str)
     parser.add_argument("--predictions_folder", type=str, help="Path to predictions")
