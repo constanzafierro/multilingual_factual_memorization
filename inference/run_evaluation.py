@@ -118,11 +118,9 @@ def main(args):
     dataset_name = get_dataset_name(args.model_name, args.language)
     pattern = os.path.join(
         args.predictions_folder,
-        args.language,
-        "*",
-        dataset_name,
-        "--",
-        args.model_name.replace("/", "__"),
+        "".join(
+            [args.language, "*", dataset_name, "--", args.model_name.replace("/", "__")]
+        ),
     )
     predictions_path = glob(pattern)
     assert len(predictions_path) == 1, pattern
