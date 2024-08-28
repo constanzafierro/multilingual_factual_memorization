@@ -6,6 +6,7 @@ import wandb
 from datasets import load_dataset
 from inference.f1_score import compute_score
 import re
+from glob import glob
 from dataset.pararel_utils import OBJECT_KEY
 from dataset.data_utils import log_trivial_examples_counts, get_dataset_name
 
@@ -115,13 +116,18 @@ def compute_metrics(df):
 
 def main(args):
     dataset_name = get_dataset_name(args.model_name, args.language)
-    predictions_path = os.path.join(
-        args.predictions_folder,
-        args.language,
-        dataset_name,
-        args.model_name.replace("/", "__"),
+    predictions_path = glob(
+        os.path.join(
+            args.predictions_folder,
+            args.language,
+            "*",
+            dataset_name,
+            "--",
+            args.model_name.replace("/", "__"),
+        )
     )
-    # TODO: glob of predictions path
+    assert len(predictions_path) == 1, predictions_path
+    predictions_path = predictions_path[0]
     experiment_dir = os.path.join(args.output_dir, os.path.basename(predictions_path))
     if args.use_sentinel_prediction:
         experiment_dir = os.path.join(experiment_dir, "sentinel_pred")
