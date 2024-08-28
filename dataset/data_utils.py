@@ -225,7 +225,7 @@ def _get_memorized_ds(dataset_name, eval_df_filename, tokenizer):
     else:
         memorized_df["raw_prediction"] = memorized_df.apply(
             lambda ex: remove_special_tokens_from_str(
-                ex["raw_pred_with_special_tokens"]
+                ex["raw_pred_with_special_tokens"], tokenizer
             ),
             axis=1,
         )
