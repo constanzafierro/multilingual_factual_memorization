@@ -177,7 +177,7 @@ if __name__ == "__main__":
 
     wandb.init(
         project="xlingual_mpararel_eval",
-        name=os.path.basename(" ".join(args.model_name, args.language)),
+        name=os.path.basename(" ".join([args.model_name, args.language])),
         config=args,
     )
 
