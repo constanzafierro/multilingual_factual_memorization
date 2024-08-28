@@ -74,18 +74,21 @@ def load_sentinel_prediction(data_path):
     return id_to_preds
 
 
-def add_raw_prediction(df, predictions_path, decoder_key):
+def add_prompt_and_raw_pred(df, predictions_path, decoder_key):
     id_to_preds = {}
+    ids_to_prompt = {}
     with open(os.path.join(predictions_path, "raw_predictions.json")) as fhandle:
         for line in fhandle:
             data = json.loads(line)
             id_to_preds[data["example_id"]] = data["predictions"][0]["answer"]
+            ids_to_prompt[data["example_id"]] = data["prompt"]
     key = (
         "decoder_pred_with_special_tokens"
         if decoder_key
         else "raw_pred_with_special_tokens"
     )
     df[key] = df.apply(lambda row: id_to_preds[row["id"]], axis=1)
+    df["input_text"] = df.apply(lambda row: ids_to_prompt[row["id"]], axis=1)
     return df
 
 
@@ -150,7 +153,7 @@ def main(args):
     else:
         id_to_prediction = load_predictions(predictions_path)
     df, scores = evaluate(dataset, id_to_prediction, args.language)
-    df = add_raw_prediction(
+    df = add_prompt_and_raw_pred(
         df, predictions_path, decoder_key=args.use_sentinel_prediction
     )
     wandb.log({k: v for k, v in scores.items() if not isinstance(v, list)})

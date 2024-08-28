@@ -116,37 +116,42 @@ def get_start_ans_idx(pred, gt_list, ignore_from_punctuation=0):
     return start_idx
 
 
+def get_ans_token_idx(ans_text_index, tokenizer_offset_mapping):
+    ans_first_token_idx = None
+    for token_i, (text_index_from, text_index_to) in enumerate(
+        tokenizer_offset_mapping
+    ):
+        if ans_text_index >= text_index_from and ans_text_index < text_index_to:
+            ans_first_token_idx = token_i
+    return ans_first_token_idx
+
+
 def add_exact_query_and_prediction(example, memorized_df, df_id_to_index, tokenizer):
     row = memorized_df.iloc[df_id_to_index[example["id"]]]
     start_index = int(row["start_answer"].item())
     if "decoder_pred_with_special_tokens" in memorized_df.columns:
-        # Note that this query_inference is assuming that the
-        # prepare_prompt will be called before this is fed into the model.
-        example["query_inference"] = example["query"]
+        example["input_ids"] = row["input_ids"]
         decoder_tokens = row["decoder_tokens"]
-        ans_first_token_idx = None
-        for i, (from_, to) in enumerate(decoder_tokens["offset_mapping"]):
-            if start_index >= from_ and start_index < to:
-                ans_first_token_idx = i
+        ans_first_token_idx = get_ans_token_idx(
+            start_index, decoder_tokens["offset_mapping"]
+        )
         example["decoder_input_ids"] = decoder_tokens["input_ids"][:ans_first_token_idx]
         example["prediction"] = tokenizer.decode(
             decoder_tokens["input_ids"][ans_first_token_idx:]
         )
     else:
         if start_index != 0:
-            try:
-                example["query_inference"] = row["raw_prediction"][:start_index].strip()
-                example["prediction"] = row["raw_prediction"][start_index:].strip()
-                example["decoder_input_ids"] = None
-
-            except Exception as e:
-                print("example in ds", example["query"])
-                print("row", row)
-                print("start_index", start_index)
-                print("prediction", row["prediction"])
-                raise (e)
+            input_pred_tokens = row["input_and_pred_tokens"]
+            ans_first_token_idx = get_ans_token_idx(
+                start_index, input_pred_tokens["offset_mapping"]
+            )
+            example["input_ids"] = input_pred_tokens["input_ids"][:ans_first_token_idx]
+            example["prediction"] = tokenizer.decode(
+                input_pred_tokens["input_ids"][ans_first_token_idx:]
+            )
+            example["decoder_input_ids"] = None
         else:
-            example["query_inference"] = example["query"]
+            example["input_ids"] = row["input_ids"]
             example["decoder_input_ids"] = None
             example["prediction"] = row["prediction"]
     return example
@@ -208,6 +213,9 @@ def _get_memorized_ds(dataset_name, eval_df_filename, tokenizer):
         log_trivial_examples_counts(memorized_df, ds)
 
     # Add 'query_inference' with all the tokens before the object.
+    memorized_df["input_ids"] = memorized_df.apply(
+        lambda row: tokenizer(row["input_text"])["input_ids"], axis=1
+    )
     if "decoder_pred_with_special_tokens" in memorized_df:
         memorized_df["decoder_tokens"] = memorized_df.apply(
             lambda row: tokenizer(
@@ -227,16 +235,23 @@ def _get_memorized_ds(dataset_name, eval_df_filename, tokenizer):
             axis=1,
         )
     else:
-        memorized_df["raw_prediction"] = memorized_df.apply(
-            lambda ex: remove_special_tokens_from_str(
-                ex["raw_pred_with_special_tokens"], tokenizer
+        memorized_df["input_and_pred_tokens"] = memorized_df.apply(
+            lambda row: tokenizer(
+                row["raw_pred_with_special_tokens"],
+                return_offsets_mapping=True,
+                add_special_tokens=False,
             ),
             axis=1,
         )
+        memorized_df["input_ids_decoded"] = memorized_df.apply(
+            lambda row: tokenizer.decode(row["input_ids"]),
+            axis=1,
+        )
         memorized_df["start_answer"] = memorized_df.apply(
-            lambda ex: get_start_ans_idx(
-                ex["raw_prediction"],
-                ex["ground_truth"],
+            lambda row: len(row["input_ids_decoded"])
+            + get_start_ans_idx(
+                row["raw_pred_with_special_tokens"][len(row["input_ids_decoded"]) :],
+                row["ground_truth"],
             ),
             axis=1,
         )
