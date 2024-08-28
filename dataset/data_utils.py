@@ -155,7 +155,7 @@ def add_exact_query_and_prediction(example, memorized_df, df_id_to_index, tokeni
             example["decoder_input_ids"] = None
             example["prediction"] = row["prediction"]
     example["query_inference"] = tokenizer.decode(
-        row["input_ids"], skip_special_tokens=True
+        example["input_ids"], skip_special_tokens=True
     )
     return example
 
