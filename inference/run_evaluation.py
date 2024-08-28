@@ -119,7 +119,13 @@ def main(args):
     pattern = os.path.join(
         args.predictions_folder,
         "".join(
-            [args.language, "*", dataset_name, "--", args.model_name.replace("/", "__")]
+            [
+                args.language,
+                "*",
+                dataset_name.split("/")[1],
+                "--",
+                args.model_name.replace("/", "__"),
+            ]
         ),
     )
     predictions_path = glob(pattern)
