@@ -20,6 +20,7 @@ def evaluate(dataset, id_to_prediction, language):
     for example in dataset:
         query_id = example["id"]
         if query_id not in id_to_prediction:
+            # TODO: There should be no missing ids. Need to run inference on these.
             counts["missing_ids"] += 1
             continue
 
@@ -124,16 +125,16 @@ def main(args):
         "".join(
             [
                 args.language,
-                "*",
+                "{}",
                 dataset_name.split("/")[1],
                 "--",
                 args.model_name.replace("/", "__"),
             ]
         ),
     )
-    predictions_path = glob(pattern)
-    assert len(predictions_path) == 1, pattern
-    predictions_path = predictions_path[0]
+    predictions_path = pattern.format("--")
+    if not os.path.isfile(os.path.join(predictions_path, "predictions.json")):
+        predictions_path = pattern.format("_")
     experiment_dir = os.path.join(args.output_dir, os.path.basename(predictions_path))
     if args.use_sentinel_prediction:
         experiment_dir = os.path.join(experiment_dir, "sentinel_pred")
@@ -176,7 +177,7 @@ if __name__ == "__main__":
 
     wandb.init(
         project="xlingual_mpararel_eval",
-        name=os.path.basename(args.model_name),
+        name=os.path.basename(" ".join(args.model_name, args.language)),
         config=args,
     )
 
