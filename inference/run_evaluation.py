@@ -91,7 +91,7 @@ def get_prompt_from_raw_preds(predictions_path):
                     args["instruction"],
                     args["is_mlm_template"],
                 )
-        ids_to_prompt[data["example_id"]] = prompt
+            ids_to_prompt[data["example_id"]] = prompt
     return ids_to_prompt
 
 
