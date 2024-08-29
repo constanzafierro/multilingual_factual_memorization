@@ -375,8 +375,11 @@ def input_ids_match(ex, numpy_result):
     if ex["decoder_input_ids"] is not None:
         decoder_input_ids = numpy_result["input_ids"][: -len(ex["decoder_input_ids"])]
         input_ids = numpy_result["input_ids"][: len(ex["decoder_input_ids"])]
-        return np.all(ex["decoder_input_ids"] == decoder_input_ids) and np.all(
-            ex["input_ids"] == input_ids
+        return (
+            len(ex["decoder_input_ids"]) == len(decoder_input_ids)
+            and np.all(ex["decoder_input_ids"] == decoder_input_ids)
+            and len(ex["input_ids"]) == len(input_ids)
+            and np.all(ex["input_ids"] == input_ids)
         )
     return len(numpy_result["input_ids"]) == len(ex["input_ids"]) and np.all(
         numpy_result["input_ids"] == ex["input_ids"]
