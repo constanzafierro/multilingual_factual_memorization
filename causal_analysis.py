@@ -373,8 +373,8 @@ def plot_average_trace_heatmap(
 
 def input_ids_match(ex, numpy_result):
     if ex["decoder_input_ids"] is not None:
-        decoder_input_ids = numpy_result["input_ids"][: -len(ex["decoder_input_ids"])]
-        input_ids = numpy_result["input_ids"][: len(ex["decoder_input_ids"])]
+        decoder_input_ids = numpy_result["input_ids"][-len(ex["decoder_input_ids"]) :]
+        input_ids = numpy_result["input_ids"][: -len(ex["decoder_input_ids"])]
         return (
             len(ex["decoder_input_ids"]) == len(decoder_input_ids)
             and np.all(ex["decoder_input_ids"] == decoder_input_ids)
