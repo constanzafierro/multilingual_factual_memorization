@@ -273,7 +273,7 @@ def _get_memorized_ds(dataset_name, eval_df_filename, tokenizer):
             memorized_df = memorized_df[~memorized_df.start_answer.isnull()]
             ds = ds.filter(lambda ex: ex["id"] in set(memorized_df["id"].values))
         memorized_df["start_answer"] = memorized_df.apply(
-            lambda row: row["start_answer"] + len(row["input_ids_decoded"])
+            lambda row: row["start_answer"] + len(row["input_ids_decoded"]), axis=1
         )
     df_id_to_index = {id_: i for i, id_ in enumerate(memorized_df.id.values)}
     ds = ds.map(
