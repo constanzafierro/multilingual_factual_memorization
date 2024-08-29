@@ -57,7 +57,7 @@ def calculate_hidden_flow(
     with torch.no_grad():
         answer_t, base_score = [d[0] for d in predict_from_input(mt.model, inp)]
     [answer] = decode_tokens(mt.tokenizer, [answer_t])
-    assert answer.startswith(expected_ans), f"{prompt}, {answer}, {expected_ans}"
+    assert expected_ans.startswith(answer), f"{prompt}, {answer}, {expected_ans}"
     e_range = find_token_range(mt.tokenizer, inp["input_ids"][0], subject, prompt)
     # Add noise and make a forward pass.
     low_score = trace_with_patch(
