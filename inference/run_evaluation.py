@@ -87,7 +87,7 @@ def get_prompt_from_raw_preds(predictions_path):
             else:
                 prompt = prepare_prompt(
                     data["query"],
-                    args["model_name"],
+                    args["model_name_or_path"],
                     args["instruction"],
                     args["is_mlm_template"],
                 )
