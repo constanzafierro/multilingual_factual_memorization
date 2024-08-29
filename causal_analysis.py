@@ -9,7 +9,7 @@ import wandb
 from tqdm import tqdm
 from transformers import T5TokenizerFast
 
-from dataset.data_utils import find_token_range, get_memorized_dataset
+from dataset.data_utils import find_token_range, get_memorized_dataset, get_dataset_name
 from model_utils import load_model_and_tok
 from patching_utils import (
     trace_important_states,
@@ -378,7 +378,9 @@ def input_ids_match(ex, numpy_result):
         return np.all(ex["decoder_input_ids"] == decoder_input_ids) and np.all(
             ex["input_ids"] == input_ids
         )
-    return np.all(numpy_result["input_ids"] == ex["input_ids"])
+    return len(numpy_result["input_ids"]) == len(ex["input_ids"]) and np.all(
+        numpy_result["input_ids"] == ex["input_ids"]
+    )
 
 
 def plot_hidden_flow(
@@ -424,16 +426,7 @@ def plot_hidden_flow(
 
 
 def main(args):
-    data_id = "_".join(
-        [
-            args.language,
-            (
-                args.dataset_name
-                if "/" not in args.dataset_name
-                else args.dataset_name.split("/")[1]
-            ),
-        ]
-    )
+    data_id = args.language
     if args.only_subset:
         data_id = data_id + "_subset"
     if args.patch_k_layers != 10:
@@ -479,9 +472,9 @@ def main(args):
                 return_p=True,
             )
         )
-
+    dataset_name = get_dataset_name(args.model_name, args.language)
     ds = get_memorized_dataset(
-        args.dataset_name,
+        dataset_name,
         args.language,
         args.eval_dir,
         args.model_name,
@@ -551,12 +544,6 @@ if __name__ == "__main__":
     )
     parser.add_argument(
         "--output_folder",
-        required=True,
-        type=str,
-        help="",
-    )
-    parser.add_argument(
-        "--dataset_name",
         required=True,
         type=str,
         help="",
