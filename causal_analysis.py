@@ -38,7 +38,6 @@ def calculate_hidden_flow(
     kind=None,
     samples=10,
     expected_ans=None,
-    metrics=None,
 ):
     """
     Copy of the function in causal_trace.ipynb
@@ -60,7 +59,6 @@ def calculate_hidden_flow(
     [answer] = decode_tokens(mt.tokenizer, [answer_t])
     if not expected_ans.startswith(answer):
         if mt.tokenizer.unk_token_id in input_ids:
-            metrics["unk_in_query_inference"] += 1
             return None
         else:
             raise Exception(
@@ -190,7 +188,7 @@ def plot_averages(
         _plot_averages(savepdf, vmin_vmax=vmin_vmax)
 
 
-def agg_causal_analysis_results(tokenizer, ds, cache_output_dir, kind):
+def agg_causal_analysis_results(tokenizer, ds, cache_output_dir, kind, missing_ids):
     tok_special_ids = set(tokenizer.all_special_ids)
     has_bos = tokenizer("some long text here")["input_ids"][0] in tok_special_ids
     has_eos = tokenizer("some long text here")["input_ids"][-1] in tok_special_ids
@@ -205,6 +203,8 @@ def agg_causal_analysis_results(tokenizer, ds, cache_output_dir, kind):
     all_scores = []
     for ex in tqdm(ds, desc="Average Examples"):
         results_file = os.path.join(cache_output_dir, f"{ex['id']}{kind}.npz")
+        if f"{ex['id']}{kind}.npz" in missing_ids:
+            continue
         numpy_result = np.load(
             os.path.join(cache_output_dir, results_file), allow_pickle=True
         )
@@ -326,8 +326,11 @@ def plot_average_trace_heatmap(
     model_name,
     tokenizer,
     use_vmin_vmax_from_folder=None,
+    missing_ids=None,
 ):
-    all_scores = agg_causal_analysis_results(tokenizer, ds, cache_output_dir, kind)
+    all_scores = agg_causal_analysis_results(
+        tokenizer, ds, cache_output_dir, kind, missing_ids
+    )
     averaged_scores = compute_averages(all_scores)
     names_and_counts = list(
         zip(averaged_scores["agg_tokens_keys"], averaged_scores["counts"])
@@ -405,7 +408,7 @@ def plot_hidden_flow(
     patch_k_layers,
     override=False,
 ):
-    metrics = collections.defaultdict(int)
+    unk_in_query_inference = set()
     for ex in tqdm(ds, desc="Examples"):
         ex_id = ex["id"]
         filename = os.path.join(cache_output_dir, f"{ex_id}{kind}.npz")
@@ -424,9 +427,9 @@ def plot_hidden_flow(
                 kind=kind,
                 window=patch_k_layers,
                 expected_ans=ex["prediction"],
-                metrics=metrics,
             )
             if not result:
+                unk_in_query_inference.add(f"{ex_id}{kind}.npz")
                 continue
             numpy_result = {
                 k: v.detach().cpu().numpy() if torch.is_tensor(v) else v
@@ -439,7 +442,7 @@ def plot_hidden_flow(
             pdf_output_dir, f'{str(numpy_result["answer"]).strip()}_{ex_id}_{kind}.pdf'
         )
         plot_trace_heatmap(numpy_result, savepdf=pdfname, modelname=mt.model_name)
-    return metrics
+    return unk_in_query_inference
 
 
 def main(args):
@@ -521,20 +524,22 @@ def main(args):
         if hasattr(mt.model, "decoder")
         else [None, "mlp", "attn"]
     )
+    failed_ids = set()
     for kind in modules:
         print("Computing for", kind)
         if not args.only_plot_average:
-            metrics = plot_hidden_flow(
-                mt,
-                ds,
-                cache_hidden_flow,
-                pdf_output_dir,
-                kind,
-                noise_level,
-                args.patch_k_layers,
-                override=args.override,
+            failed_ids.update(
+                plot_hidden_flow(
+                    mt,
+                    ds,
+                    cache_hidden_flow,
+                    pdf_output_dir,
+                    kind,
+                    noise_level,
+                    args.patch_k_layers,
+                    override=args.override,
+                )
             )
-            wandb.log(metrics)
         plot_average_trace_heatmap(
             ds,
             cache_hidden_flow,
@@ -543,7 +548,9 @@ def main(args):
             mt.model_name,
             mt.tokenizer,
             args.use_vmin_vmax_from_folder,
+            failed_ids,
         )
+    wandb.log({"unk_in_query_inference": len(failed_ids)})
 
 
 if __name__ == "__main__":
