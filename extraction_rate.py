@@ -137,9 +137,9 @@ def main(args):
             last_token_index = subj_range[1] - 1
         if not args.hook_modules:
             args.hook_modules = (
-                ["cross_attn", None, "mlp", "attn"]
+                ["cross_attn", "out", "mlp", "attn"]
                 if hasattr(model, "decoder")
-                else [None, "mlp", "attn"]
+                else ["out", "mlp", "attn"]
             )
         hooks = set_act_get_hooks(
             model,
