@@ -61,6 +61,7 @@ def calculate_hidden_flow(
     if not expected_ans.startswith(answer):
         if mt.tokenizer.unk_token_id in input_ids:
             metrics["unk_in_query_inference"] += 1
+            return None
         else:
             raise Exception(
                 "For the prompt='{}', expected to get the beggining of '{}' but"
@@ -425,6 +426,8 @@ def plot_hidden_flow(
                 expected_ans=ex["prediction"],
                 metrics=metrics,
             )
+            if not result:
+                continue
             numpy_result = {
                 k: v.detach().cpu().numpy() if torch.is_tensor(v) else v
                 for k, v in result.items()
