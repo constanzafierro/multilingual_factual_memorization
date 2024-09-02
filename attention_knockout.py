@@ -2,6 +2,7 @@ import argparse
 import functools
 import json
 import os
+from functools import partial
 
 import pandas as pd
 import torch
@@ -33,9 +34,9 @@ def remove_hooks(hooks):
 # To do this, we add a wrapper around the attention module, because
 # the mask is passed as an additional argument, which could not be fetched
 # with standard hooks before pytorch 2.0.
-def set_block_attn_hooks(model, layer_to_source_target_blockage, opposite=False):
+def set_block_attn_hooks(model, layer_to_source_target_blockage):
 
-    def wrap_attn_forward(forward_fn, model_, from_to_index_, opposite_):
+    def wrap_attn_forward(forward_fn, model_, from_to_index_):
         @functools.wraps(forward_fn)
         def wrapper_fn(*args, **kwargs):
             new_args = []
@@ -46,42 +47,55 @@ def set_block_attn_hooks(model, layer_to_source_target_blockage, opposite=False)
                 new_kwargs[k] = v
 
             hs = kwargs["hidden_states"] if "hidden_states" in kwargs else args[0]
-            num_tokens = list(hs[0].size())[0]
-
-            if opposite_:
+            num_hs_tokens = list(hs[0].size())[0]
+            # Mask is (batch_size, key_length) (non-causal) or (batch_size, key_length, key_length)
+            attention_mask_key = (
+                "attention_mask" if "attention_mask" in kwargs else "mask"
+            )
+            causal_attention = (
+                kwargs[attention_mask_key].shape[-2]
+                == kwargs[attention_mask_key].shape[-1]
+            )
+            # The mask argument is only used in the first layer in mt5,
+            # afterwards the position_bias term drives the masking logic.
+            attention_mask_key = (
+                "attention_mask" if "attention_mask" in kwargs else "position_bias"
+            )
+            # Decoder only model or the decoder self attention block.
+            if causal_attention:
                 attn_mask = torch.tril(
-                    torch.zeros((num_tokens, num_tokens), dtype=torch.uint8)
-                )
-                for s, t in from_to_index_:
-                    attn_mask[s, t] = 1
-            else:
-                attn_mask = torch.tril(
-                    torch.ones((num_tokens, num_tokens), dtype=torch.uint8)
+                    torch.ones((num_hs_tokens, num_hs_tokens), dtype=torch.uint8)
                 )
                 for s, t in from_to_index_:
                     attn_mask[s, t] = 0
-            attn_mask = attn_mask.repeat(1, kwargs["attention_mask"].shape[1], 1, 1)
+                attn_mask = attn_mask.repeat(1, kwargs["attention_mask"].shape[1], 1, 1)
+                attn_mask = attn_mask.to(dtype=model_.dtype)  # fp16 compatibility
+                # Padding elements are indicated by very large negative values.
+                attn_mask = (1.0 - attn_mask) * torch.finfo(model_.dtype).min
+            # Encoder self attention or the decoder cross attention block.
+            else:
+                # The position_bias is (batch_size, num_heads, hidden_states_length, key_values_length)
+                attn_mask = kwargs[attention_mask_key].copy()
+                for s, t in from_to_index_:
+                    attn_mask[:, :, s, t] = torch.finfo(model_.dtype).min
 
-            attn_mask = attn_mask.to(dtype=model_.dtype)  # fp16 compatibility
-            # Padding elements are indicated by very large negative values.
-            attn_mask = (1.0 - attn_mask) * torch.finfo(model_.dtype).min
             attn_mask = attn_mask.to(hs.device)
-
-            new_kwargs["attention_mask"] = attn_mask
+            new_kwargs[attention_mask_key] = attn_mask
 
             return forward_fn(*new_args, **new_kwargs)
 
         return wrapper_fn
 
     hooks = []
-    for layer in layer_to_source_target_blockage.keys():
-        module_to_hook = get_module(model, layername(model, num=layer, kind="attn"))
+    for stack, layer, kind in layer_to_source_target_blockage.keys():
+        module_to_hook = get_module(
+            model, layername(model, num=layer, stack=stack, kind="attn")
+        )
         hook = module_to_hook.forward
         module_to_hook.forward = wrap_attn_forward(
             module_to_hook.forward,
             model,
             layer_to_source_target_blockage[layer],
-            opposite,
         )
         hooks.append((layer, hook))
 
@@ -131,6 +145,102 @@ def get_output_dir(args):
     return output_folder
 
 
+def get_block_indices(model_name, e_range, inp):
+    def get_block_config(
+        block_from, block_indices, layer, total_layers, stack="encoder", kind="attn"
+    ):
+        layers_to_block = range(
+            max(0, layer - args.patch_k_layers // 2),
+            min(total_layers, layer - (-args.patch_k_layers // 2)),
+        )
+        return {
+            (stack, l_block, kind): [
+                (block_from, to_block) for to_block in block_indices
+            ]
+            for l_block in layers_to_block
+        }
+
+    input_ids_count = inp["input_ids"].shape[1]
+    if "t5" not in model_name:
+        last_token = input_ids_count - 1
+        block_indices_desc = [
+            ([x for x in e_range], "subject"),
+            ([e_range[-1]], "last_subject"),
+            (
+                [x for x in range(input_ids_count - 1) if x not in e_range],
+                "non-subject",
+            ),
+            ([last_token], "last"),
+        ]
+        return [
+            (
+                partial(
+                    get_block_config,
+                    block_from=last_token,
+                    block_indices=block_indices,
+                ),
+                block_desc,
+            )
+            for block_indices, block_desc in block_indices_desc
+        ]
+    else:
+        decoder_ids_count = inp["decoder_input_ids"].shape[1]
+        last_token = decoder_ids_count - 1
+        sentinel_token = (inp["input_ids"][0] == 250099).nonzero().item()
+        block_indices_desc = [
+            (
+                sentinel_token,
+                [x for x in e_range],
+                "encoder",
+                "attn",
+                "sentinel->subject",
+            ),
+            (
+                sentinel_token,
+                [x for x in range(input_ids_count - 1) if x not in e_range],
+                "encoder",
+                "attn",
+                "sentinel->non_subject",
+            ),
+            (sentinel_token, [sentinel_token], "encoder", "sentinel->itself"),
+            (
+                last_token,
+                [x for x in e_range],
+                "decoder",
+                "cross_attn",
+                "last->subject",
+            ),
+            (
+                last_token,
+                [x for x in range(input_ids_count - 1) if x not in e_range],
+                "decoder",
+                "cross_attn",
+                "last->non_subject",
+            ),
+            (
+                last_token,
+                [i for i in range(last_token)],
+                "decoder",
+                "attn",
+                "last->decoder_tokens",
+            ),
+            (last_token, [last_token], "decoder", "attn", "last->itself"),
+        ]
+        return [
+            (
+                partial(
+                    get_block_config,
+                    block_from=block_from,
+                    block_indices=block_to_indices,
+                    stack=stack,
+                    kind=attn_kind,
+                ),
+                block_desc,
+            )
+            for block_from, block_to_indices, stack, attn_kind, block_desc in block_indices_desc
+        ]
+
+
 def main(args):
     output_folder = get_output_dir(args)
     device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
@@ -147,19 +257,18 @@ def main(args):
         args.resample_trivial,
         args.keep_only_trivial,
     )
-    already_computed_blocks = set()
-    existing_df = None
-    if os.path.isfile(os.path.join(output_folder, "results.csv")):
-        existing_df = pd.read_csv(os.path.join(output_folder, "results.csv"))
-        already_computed_blocks = existing_df.block_desc.unique()
     # Run attention knockouts
     results = []
+    block_configs = []
     for ex in tqdm(ds, desc="Examples"):
         ex_id = ex["id"]
         input_prompt = ex["query_inference"]
         subject = ex["sub_label"]
         inp = {"input_ids": torch.tensor([ex["input_ids"]]).to(device)}
         inp["attention_mask"] = torch.ones_like(inp["input_ids"])
+        if ex["decoder_input_ids"] is not None:
+            decoder_input_ids = torch.tensor([ex["decoder_input_ids"]]).to(device)
+            inp = {**inp, "decoder_input_ids": decoder_input_ids}
 
         e_range = find_token_range(
             mt.tokenizer, inp["input_ids"][0], subject, input_prompt
@@ -171,26 +280,9 @@ def main(args):
         base_score = base_score.cpu().item()
         [answer] = decode_tokens(mt.tokenizer, [answer_t])
 
-        tokens_count = inp["input_ids"].shape[1]
-        last_token = tokens_count - 1
-
-        for block_indices, block_desc in [
-            ([x for x in e_range], "subject"),
-            ([e_range[-1]], "last_subject"),
-            ([x for x in range(tokens_count - 1) if x not in e_range], "non-subject"),
-            ([last_token], "last"),
-        ]:
-            if block_desc in already_computed_blocks:
-                continue
+        for block_indices, block_desc in get_block_indices(args.model_name):
             for layer in range(mt.num_layers):
-                layers_to_block = range(
-                    max(0, layer - args.patch_k_layers // 2),
-                    min(mt.num_layers, layer - (-args.patch_k_layers // 2)),
-                )
-                block_config = {
-                    l_block: [(last_token, to_block) for to_block in block_indices]
-                    for l_block in layers_to_block
-                }
+                block_config = block_indices(layer=layer, total_layers=mt.num_layers)
                 probs = trace_with_attn_blockage(mt.model, inp, block_config, answer_t)
                 new_score = probs.cpu().item()
                 results.append(
@@ -206,16 +298,20 @@ def main(args):
                         "is_subject_position_zero": is_subject_position_zero,
                     }
                 )
+                block_configs.append(
+                    {
+                        "block_desc": block_desc,
+                        "layer": layer,
+                        "block_config": block_config,
+                    }
+                )
     df = pd.DataFrame(results)
-    if existing_df is not None:
-        pd.concat([existing_df, df]).to_csv(
-            os.path.join(output_folder, "results.csv"), index=False
-        )
-    else:
-        df.to_csv(os.path.join(output_folder, "results.csv"), index=False)
+    df.to_csv(os.path.join(output_folder, "results.csv"), index=False)
     print("Writing config")
     with open(os.path.join(output_folder, "args.json"), "w") as f:
         json.dump(args.__dict__, f, indent=2)
+    with open(os.path.join(output_folder, "block_configs.json"), "w") as f:
+        json.dump(block_configs, f)
 
 
 if __name__ == "__main__":
