@@ -531,8 +531,8 @@ def layername(model, num=-1, kind=None, stack="encoder"):
         if kind in kind_to_layer:
             return kind_to_layer[kind]
         kind_map = {
-            "attn": "0.dropout",
-            "cross_attn": "1.dropout",
+            "attn": "0.SelfAttention",
+            "cross_attn": "1.EncDecAttention",
             "mlp": "1" if stack == "encoder" else "2" + ".dropout",
         }
         return (

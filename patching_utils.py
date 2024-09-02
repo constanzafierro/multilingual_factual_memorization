@@ -69,6 +69,8 @@ def trace_with_patch(
 
     # We report softmax probabilities for the answers_t token predictions of interest.
     if noise:
+        # Logits is a tuple with length max_new_tokens and each element is a
+        # tensor of shape (batch_size, config.vocab_size).
         probs = torch.softmax(outputs_exp.logits[-1][1:, :], dim=1).mean(dim=0)[
             answers_t
         ]
