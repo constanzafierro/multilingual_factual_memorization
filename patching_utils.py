@@ -105,7 +105,7 @@ def trace_important_states(
     for ids_key, stack in [("input_ids", "encoder"), ("decoder_input_ids", "decoder")]:
         if ids_key not in inp:
             continue
-        if tokens_to_patch is None:
+        if ntoks is None:
             tokens_to_patch = range(inp[ids_key].shape[1])
         for tnum in tokens_to_patch:
             row = []
