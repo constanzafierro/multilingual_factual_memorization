@@ -17,13 +17,8 @@ from third_party.rome.util.nethook import get_module
 
 
 def get_hidden_state_from_output(model, output, tok_index, output_type):
-    if isinstance(model, XGLMForCausalLM) or isinstance(model, GPT2LMHeadModel):
-        if output_type.startswith("attn") or output_type.startswith("out"):
-            # This output is a tuple.
-            output = output[0]
-        return output[:, tok_index].detach()
-    elif isinstance(model, MT5ForConditionalGeneration):
-        if output_type.startswith("out"):
+    if type(model) in {XGLMForCausalLM, GPT2LMHeadModel, MT5ForConditionalGeneration}:
+        if not output_type.startswith("mlp"):
             # The first position of the output tuple contains the hidden
             output = output[0]
         return output[:, tok_index].detach()
