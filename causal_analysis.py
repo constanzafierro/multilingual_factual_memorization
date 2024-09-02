@@ -38,6 +38,7 @@ def calculate_hidden_flow(
     kind=None,
     samples=10,
     expected_ans=None,
+    metrics=None,
 ):
     """
     Copy of the function in causal_trace.ipynb
@@ -57,7 +58,14 @@ def calculate_hidden_flow(
     with torch.no_grad():
         answer_t, base_score = [d[0] for d in predict_from_input(mt.model, inp)]
     [answer] = decode_tokens(mt.tokenizer, [answer_t])
-    assert expected_ans.startswith(answer), f"{prompt}, {answer}, {expected_ans}"
+    if not expected_ans.startswith(answer):
+        if mt.tokenizer.unk_token_id in input_ids:
+            metrics["unk_in_query_inference"] += 1
+        else:
+            raise Exception(
+                "For the prompt='{}', expected to get the beggining of '{}' but"
+                "instead got='{}'".format(prompt, expected_ans, answer)
+            )
     e_range = find_token_range(mt.tokenizer, inp["input_ids"][0], subject, prompt)
     # Add noise and make a forward pass.
     low_score = trace_with_patch(
@@ -396,6 +404,7 @@ def plot_hidden_flow(
     patch_k_layers,
     override=False,
 ):
+    metrics = collections.defaultdict(int)
     for ex in tqdm(ds, desc="Examples"):
         ex_id = ex["id"]
         filename = os.path.join(cache_output_dir, f"{ex_id}{kind}.npz")
@@ -414,6 +423,7 @@ def plot_hidden_flow(
                 kind=kind,
                 window=patch_k_layers,
                 expected_ans=ex["prediction"],
+                metrics=metrics,
             )
             numpy_result = {
                 k: v.detach().cpu().numpy() if torch.is_tensor(v) else v
@@ -426,6 +436,7 @@ def plot_hidden_flow(
             pdf_output_dir, f'{str(numpy_result["answer"]).strip()}_{ex_id}_{kind}.pdf'
         )
         plot_trace_heatmap(numpy_result, savepdf=pdfname, modelname=mt.model_name)
+    return metrics
 
 
 def main(args):
@@ -510,7 +521,7 @@ def main(args):
     for kind in modules:
         print("Computing for", kind)
         if not args.only_plot_average:
-            plot_hidden_flow(
+            metrics = plot_hidden_flow(
                 mt,
                 ds,
                 cache_hidden_flow,
@@ -520,6 +531,7 @@ def main(args):
                 args.patch_k_layers,
                 override=args.override,
             )
+            wandb.log(metrics)
         plot_average_trace_heatmap(
             ds,
             cache_hidden_flow,
