@@ -89,7 +89,7 @@ def set_block_attn_hooks(model, layer_to_source_target_blockage):
     hooks = []
     for stack, layer, kind in layer_to_source_target_blockage.keys():
         module_to_hook = get_module(
-            model, layername(model, num=layer, stack=stack, kind="attn")
+            model, layername(model, num=layer, stack=stack, kind=kind)
         )
         hook = module_to_hook.forward
         module_to_hook.forward = wrap_attn_forward(
