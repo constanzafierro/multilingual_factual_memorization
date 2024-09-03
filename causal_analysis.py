@@ -446,7 +446,17 @@ def plot_hidden_flow(
 
 
 def main(args):
-    data_id = args.language
+    dataset_name = get_dataset_name(args.model_name, args.language)
+    data_id = "_".join(
+        [
+            args.language,
+            (
+                args.dataset_name
+                if "/" not in args.dataset_name
+                else args.dataset_name.split("/")[1]
+            ),
+        ]
+    )
     if args.only_subset:
         data_id = data_id + "_subset"
     if args.patch_k_layers != 10:
@@ -492,7 +502,6 @@ def main(args):
                 return_p=True,
             )
         )
-    dataset_name = get_dataset_name(args.model_name, args.language)
     ds = get_memorized_dataset(
         dataset_name,
         args.language,
