@@ -90,6 +90,7 @@ def main(args):
             os.path.dirname(args.output_folder),
             os.path.basename(args.output_folder) + f"_top{args.store_topk}",
         )
+        os.makedirs(os.path.join(args.output_folder, "tmp"))
     args.output_folder = os.path.join(args.output_folder, args.model_name, data_id)
     wandb.config["final_output_dir"] = args.output_folder
     os.makedirs(args.output_folder, exist_ok=True)
@@ -201,10 +202,10 @@ def main(args):
         pd.DataFrame(records).to_csv(filename, index=False)
         tmp_stored_records.append(filename)
         df = pd.concat([pd.read_csv(f) for f in tmp_stored_records])
+        shutil.rmtree(os.path.join(args.output_folder, "tmp"))
     else:
         df = pd.DataFrame(records)
     df.to_csv(os.path.join(args.output_folder, "extraction_events.csv"), index=False)
-    shutil.rmtree(os.path.join(args.output_folder, "tmp"))
     with open(os.path.join(args.output_folder, "args.json"), "w") as f:
         json.dump(args.__dict__, f, indent=2)
     df[["proj_vec", "language", "relation", "layer", "pred_in_top_1"]].groupby(
