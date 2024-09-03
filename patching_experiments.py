@@ -12,25 +12,43 @@ from tqdm import tqdm
 
 from dataset.data_utils import find_token_range, get_dataset_name, get_memorized_dataset
 from model_utils import load_model_and_tok
-from patching_utils import trace_important_states, trace_important_window
+from patching_utils import trace_important_states
 from third_party.rome.experiments.causal_trace import (
     decode_tokens,
 )
 
 
-def get_token_indices(token_to_patch, examples, input_ids, input_prompts, tokenizer):
+def get_token_indices_patches(token_to_patch, examples, inp, input_prompts, tokenizer):
     if token_to_patch == "last":
         token_idx_to_patch_from = -1
         token_idx_to_patch = -1
+        if "decoder_input_ids" not in inp:
+            return [
+                (
+                    token_idx_to_patch_from,
+                    token_idx_to_patch,
+                    ("input_ids", "encoder"),
+                )
+            ]
+        sentinel_token_0 = (inp["input_ids"][0] == 250099).nonzero().item()
+        sentinel_token_1 = (inp["input_ids"][1] == 250099).nonzero().item()
+        return [
+            (sentinel_token_0, sentinel_token_1, ("input_ids", "encoder")),
+            (
+                token_idx_to_patch_from,
+                token_idx_to_patch,
+                ("decoder_input_ids", "decoder"),
+            ),
+        ]
     elif token_to_patch == "last_subject_token":
         subj_ranges = []
-        for ex, inp, prompt in zip(examples, input_ids, input_prompts):
+        for ex, input_ids, prompt in zip(examples, inp["input_ids"], input_prompts):
             subj_ranges.append(
-                find_token_range(tokenizer, inp, ex["sub_label"], prompt)
+                find_token_range(tokenizer, input_ids, ex["sub_label"], prompt)
             )
         token_idx_to_patch_from = subj_ranges[0][-1] - 1
         token_idx_to_patch = subj_ranges[1][-1] - 1
-    return token_idx_to_patch_from, token_idx_to_patch
+        return [(token_idx_to_patch_from, token_idx_to_patch, ("input_ids", "encoder"))]
 
 
 def patch_ex1_into_ex2(mt, ex1, ex2, num_layers, kind, window, token_to_patch="last"):
@@ -41,8 +59,23 @@ def patch_ex1_into_ex2(mt, ex1, ex2, num_layers, kind, window, token_to_patch="l
         input_prompts.append(ex["query_inference"])
     mt.tokenizer.padding_side = "left"
     inp = mt.tokenizer(input_prompts, return_tensors="pt", padding=True).to(device)
-    token_idx_to_patch_from, token_idx_to_patch = get_token_indices(
-        token_to_patch, [ex1, ex2], inp["input_ids"], input_prompts, mt.tokenizer
+    if ex1["decoder_input_ids"] is not None:
+        max_len = max(
+            [len(i) for i in [ex1["decoder_input_ids"], ex2["decoder_input_ids"]]]
+        )
+        decoder_input_ids = (
+            torch.zeros(2, max_len, dtype=inp["input_ids"].dtype)
+            + mt.tokenizer.pad_token_id
+        )
+        decoder_input_ids[0, -len(ex1["decoder_input_ids"]) :] = torch.tensor(
+            ex1["decoder_input_ids"]
+        )
+        decoder_input_ids[1, -len(ex2["decoder_input_ids"]) :] = torch.tensor(
+            ex2["decoder_input_ids"]
+        )
+        inp["decoder_input_ids"] = decoder_input_ids
+    patches = get_token_indices_patches(
+        token_to_patch, [ex1, ex2], inp, input_prompts, mt.tokenizer
     )
 
     output = mt.model.generate(
@@ -53,47 +86,60 @@ def patch_ex1_into_ex2(mt, ex1, ex2, num_layers, kind, window, token_to_patch="l
     base_entropies = -torch.sum(probs * torch.log(probs + 1e-10), dim=-1)
 
     answers = decode_tokens(mt.tokenizer, preds_tokens)
+    assert ex1["prediction"].startswith(answers[0]), ex1["id"]
+    assert ex2["prediction"].startswith(answers[1]), ex2["id"]
+    patches_results = []
+    # TODO: should we patch the subject on a window?
     if kind is None:
-        results = trace_important_states(
-            mt.model,
-            num_layers,
-            inp,
-            e_range=None,
-            answer_t=preds_tokens,
-            noise=None,
-            ntoks=[(token_idx_to_patch_from, token_idx_to_patch)],
-        )
-    else:
-        results = trace_important_window(
-            mt.model,
-            num_layers,
-            inp,
-            e_range=None,
-            answer_t=preds_tokens,
-            kind=kind,
-            window=window,
-            noise=None,
-            ntoks=[(token_idx_to_patch_from, token_idx_to_patch)],
-        )
-    probs, ranks, ranks_from_tokens, pred_token, entropy = [
-        r.detach().cpu() for r in results
-    ]
+        for token_idx_to_patch_from, token_idx_to_patch, ids_stack in patches:
+            results = trace_important_states(
+                mt.model,
+                num_layers,
+                inp,
+                e_range=None,
+                answer_t=preds_tokens,
+                noise=None,
+                ntoks=[(token_idx_to_patch_from, token_idx_to_patch)],
+                ids_stack=ids_stack,
+            )
+            probs, ranks, ranks_from_tokens, pred_token, entropy = [
+                r.detach().cpu() for r in results
+            ]
+            patches_results.append(
+                dict(
+                    # The probability of getting each of the answers.
+                    patch_probs=probs,
+                    patch_ranks=ranks,
+                    patch_ranks_tokens=ranks_from_tokens,
+                    patch_pred_token=pred_token,
+                    patch_entropy=entropy,
+                    patched_ids_from=ids_stack[0],
+                    patched_tokens_from_to=(
+                        token_idx_to_patch_from,
+                        token_idx_to_patch,
+                    ),
+                )
+            )
     return dict(
         input_ids=inp["input_ids"].detach().cpu().numpy(),
         input_tokens=decode_tokens(mt.tokenizer, inp["input_ids"]),
+        decoder_input_ids=(
+            None
+            if "decoder_input_ids" not in inp
+            else inp["decoder_input_ids"].detach().cpu().numpy()
+        ),
+        decoder_input_tokens=(
+            None
+            if "decoder_input_ids" not in inp
+            else decode_tokens(mt.tokenizer, inp["decoder_input_ids"])
+        ),
         base_probs=preds_probs,
         base_answer_tokens=preds_tokens,
         base_answers=answers,
         base_entropies=base_entropies,
         window=window,
-        # The probability of getting each of the answers.
-        patch_probs=probs,
-        patch_ranks=ranks,
-        patch_ranks_tokens=ranks_from_tokens,
-        patch_pred_token=pred_token,
-        patch_entropy=entropy,
-        patched_tokens_from_to=(token_idx_to_patch_from, token_idx_to_patch),
         kind=kind or "",
+        results=patches_results,
     )
 
 

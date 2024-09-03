@@ -97,12 +97,14 @@ def trace_with_patch(
 
 
 def trace_important_states(
-    model, num_layers, inp, e_range, answer_t, noise=0.1, ntoks=None
+    model, num_layers, inp, e_range, answer_t, noise=0.1, ntoks=None, ids_stack=None
 ):
     """Copy of the function in causal_trace.ipynb"""
     table = []
     tokens_to_patch = ntoks
-    for ids_key, stack in [("input_ids", "encoder"), ("decoder_input_ids", "decoder")]:
+    if not ids_stack:
+        ids_stack = [("input_ids", "encoder"), ("decoder_input_ids", "decoder")]
+    for ids_key, stack in ids_stack:
         if ids_key not in inp:
             continue
         if ntoks is None:
