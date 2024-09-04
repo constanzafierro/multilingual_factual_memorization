@@ -101,13 +101,17 @@ def add_prompt_and_raw_pred(df, predictions_path, decoder_key):
     with open(os.path.join(predictions_path, "raw_predictions.json")) as fhandle:
         for line in fhandle:
             data = json.loads(line)
-            id_to_preds[data["example_id"]] = data["predictions"][0]["answer"]
-    key = (
-        "decoder_pred_with_special_tokens"
-        if decoder_key
-        else "raw_pred_with_special_tokens"
+            id_to_preds[data["example_id"]] = {
+                "token_ids": data["predictions"][0]["output_ids"],
+                "decoded": data["predictions"][0]["answer"],
+            }
+    key = "decoder" if decoder_key else "raw"
+    df[f"{key}_pred_with_special_tokens"] = df.apply(
+        lambda row: id_to_preds[row["id"]]["decoded"], axis=1
     )
-    df[key] = df.apply(lambda row: id_to_preds[row["id"]], axis=1)
+    df[f"pred_tokens_with_special_tokens"] = df.apply(
+        lambda row: id_to_preds[row["id"]]["token_ids"], axis=1
+    )
     df["input_text"] = df.apply(lambda row: ids_to_prompt[row["id"]], axis=1)
     return df
 
