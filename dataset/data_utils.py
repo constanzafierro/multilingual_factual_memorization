@@ -284,6 +284,16 @@ def _get_memorized_ds(dataset_name, eval_df_filename, tokenizer):
             tokenizer=tokenizer,
         )
     )
+    key = "decoder_" if "decoder_pred_with_special_tokens" in memorized_df else ""
+    len_before = len(ds)
+    ds = ds.filter(
+        # Check that the decoding and tokenization did not wrongly removed some
+        # necessary tokens for obtaining the exact same precition.
+        lambda ex: ex["pred_tokens_with_special_tokens"][: len(ex[f"{key}input_ids"])]
+        == ex[f"{key}input_ids"]
+    )
+    if wandb.run is not None:
+        wandb.run.summary["tokenization_problem"] = len_before - len(ds)
     return ds
 
 
