@@ -211,7 +211,7 @@ def main(args):
     df[["proj_vec", "language", "relation", "layer", "pred_in_top_1"]].groupby(
         by=["proj_vec", "language", "relation", "layer"], as_index=False
     ).mean().to_csv(
-        os.path.join(args.output_folder, f"{filename}_avg_relation.csv"),
+        os.path.join(args.output_folder, f"extraction_events_avg_relation.csv"),
         index=False,
     )
 
