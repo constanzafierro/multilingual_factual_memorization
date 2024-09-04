@@ -157,6 +157,7 @@ def add_exact_query_and_prediction(example, memorized_df, df_id_to_index, tokeni
     example["query_inference"] = tokenizer.decode(
         example["input_ids"], skip_special_tokens=True
     )
+    example["raw_pred_token_ids"] = row["pred_tokens_with_special_tokens"]
     return example
 
 
@@ -289,7 +290,7 @@ def _get_memorized_ds(dataset_name, eval_df_filename, tokenizer):
     ds = ds.filter(
         # Check that the decoding and tokenization did not wrongly removed some
         # necessary tokens for obtaining the exact same precition.
-        lambda ex: ex["pred_tokens_with_special_tokens"][: len(ex[f"{key}input_ids"])]
+        lambda ex: ex["raw_pred_token_ids"][: len(ex[f"{key}input_ids"])]
         == ex[f"{key}input_ids"]
     )
     if wandb.run is not None:
