@@ -450,11 +450,7 @@ def main(args):
     data_id = "_".join(
         [
             args.language,
-            (
-                args.dataset_name
-                if "/" not in args.dataset_name
-                else args.dataset_name.split("/")[1]
-            ),
+            (dataset_name if "/" not in dataset_name else dataset_name.split("/")[1]),
         ]
     )
     if args.only_subset:
