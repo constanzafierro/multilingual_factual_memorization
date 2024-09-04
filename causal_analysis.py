@@ -215,10 +215,8 @@ def agg_causal_analysis_results(tokenizer, ds, cache_output_dir, kind, missing_i
             encoder_scores = numpy_result["scores"][: -len(decoder_input_ids)]
             decoder_scores = numpy_result["scores"][len(encoder_scores) :]
             decoder_input_ids = input_ids[len(encoder_scores) :]
-            assert np.all(
-                ex["decoder_input_ids"] == decoder_input_ids
-            ), f"{ex['id']}_{kind}"
             input_ids = input_ids[: len(encoder_scores)]
+        assert input_ids_match(ex, numpy_result), f"{ex['id']}_{kind}"
 
         ex_scores = collections.defaultdict(list)
         first_subj_token = numpy_result["subject_range"][0]
