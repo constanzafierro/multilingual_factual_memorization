@@ -34,7 +34,7 @@ def remove_hooks(hooks):
 # To do this, we add a wrapper around the attention module, because
 # the mask is passed as an additional argument, which could not be fetched
 # with standard hooks before pytorch 2.0.
-def set_block_attn_hooks(model, layer_to_source_target_blockage):
+def set_block_attn_hooks(model, attn_layer_to_blockage):
 
     def wrap_attn_forward(forward_fn, model_, from_to_index_):
         @functools.wraps(forward_fn)
@@ -87,7 +87,7 @@ def set_block_attn_hooks(model, layer_to_source_target_blockage):
         return wrapper_fn
 
     hooks = []
-    for stack, layer, kind in layer_to_source_target_blockage.keys():
+    for (stack, layer, kind), blockage in attn_layer_to_blockage.items():
         module_to_hook = get_module(
             model, layername(model, num=layer, stack=stack, kind=kind)
         )
@@ -95,7 +95,7 @@ def set_block_attn_hooks(model, layer_to_source_target_blockage):
         module_to_hook.forward = wrap_attn_forward(
             module_to_hook.forward,
             model,
-            layer_to_source_target_blockage[layer],
+            blockage,
         )
         hooks.append((layer, hook))
 
