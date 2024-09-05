@@ -20,8 +20,10 @@ from third_party.rome.util.nethook import get_module
 
 
 def remove_wrapper(model, hooks):
-    for i, hook in hooks:
-        module_to_hook = get_module(model, layername(model, num=i, kind="attn"))
+    for layer, stack, kind, hook in hooks:
+        module_to_hook = get_module(
+            model, layername(model, num=layer, stack=stack, kind=kind)
+        )
         module_to_hook.forward = hook
 
 
@@ -58,9 +60,9 @@ def set_block_attn_hooks(model, attn_layer_to_blockage):
             )
             # The mask argument is only used in the first layer in mt5,
             # afterwards the position_bias term drives the masking logic.
-            attention_mask_key = (
-                "attention_mask" if "attention_mask" in kwargs else "position_bias"
-            )
+            if attention_mask_key == "mask" and kwargs["position_bias"] is not None:
+                attention_mask_key = "position_bias"
+
             # Decoder only model or the decoder self attention block.
             if causal_attention:
                 attn_mask = torch.tril(
@@ -68,14 +70,33 @@ def set_block_attn_hooks(model, attn_layer_to_blockage):
                 )
                 for s, t in from_to_index_:
                     attn_mask[s, t] = 0
-                attn_mask = attn_mask.repeat(1, kwargs["attention_mask"].shape[1], 1, 1)
+                attn_mask = attn_mask.repeat(
+                    1, kwargs[attention_mask_key].shape[1], 1, 1
+                )
                 attn_mask = attn_mask.to(dtype=model_.dtype)  # fp16 compatibility
                 # Padding elements are indicated by very large negative values.
                 attn_mask = (1.0 - attn_mask) * torch.finfo(model_.dtype).min
             # Encoder self attention or the decoder cross attention block.
+            # First layer has no position_bias yet.
+            elif kwargs["position_bias"] is None:
+                # Note that we assume that there is no padding, we assume the
+                # initial mask is just 1s.
+                attn_mask = torch.ones(
+                    (num_hs_tokens, kwargs[attention_mask_key].shape[-1]),
+                    dtype=torch.uint8,
+                )
+                for s, t in from_to_index_:
+                    attn_mask[s, t] = 0
+                # In mT5 when summed to the position bias the second dimension
+                # will be broadcasted to the num_heads, for now it is simply 1.
+                attn_mask = attn_mask.repeat(
+                    1, kwargs[attention_mask_key].shape[1], 1, 1
+                )
+                attn_mask = attn_mask.to(dtype=model_.dtype)
+                attn_mask = (1.0 - attn_mask) * torch.finfo(model_.dtype).min
             else:
                 # The position_bias is (batch_size, num_heads, hidden_states_length, key_values_length)
-                attn_mask = kwargs[attention_mask_key].copy()
+                attn_mask = kwargs[attention_mask_key].detach().clone()
                 for s, t in from_to_index_:
                     attn_mask[:, :, s, t] = torch.finfo(model_.dtype).min
 
@@ -97,7 +118,7 @@ def set_block_attn_hooks(model, attn_layer_to_blockage):
             model,
             blockage,
         )
-        hooks.append((layer, hook))
+        hooks.append((layer, stack, kind, hook))
 
     return hooks
 
@@ -105,13 +126,13 @@ def set_block_attn_hooks(model, attn_layer_to_blockage):
 def trace_with_attn_blockage(
     model,
     inp,
-    layer_to_source_target_blockage,  # A list of (source index, target index) to block
+    block_config,  # A list of (source index, target index) to block
     answers_t,
 ):
     """Forward pass with source attn being blocked to the target."""
     with torch.no_grad():
         # set hooks
-        block_attn_hooks = set_block_attn_hooks(model, layer_to_source_target_blockage)
+        block_attn_hooks = set_block_attn_hooks(model, block_config)
 
         # get prediction
         outputs_exp = model(**inp)
@@ -279,6 +300,7 @@ def main(args):
         answer_t, base_score = [d[0] for d in predict_from_input(mt.model, inp)]
         base_score = base_score.cpu().item()
         [answer] = decode_tokens(mt.tokenizer, [answer_t])
+        assert ex["prediction"].startswith(answer), ex["id"]
 
         for block_indices, block_desc in get_block_indices(
             args.model_name, e_range, inp
