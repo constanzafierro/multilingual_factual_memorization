@@ -280,7 +280,9 @@ def main(args):
         base_score = base_score.cpu().item()
         [answer] = decode_tokens(mt.tokenizer, [answer_t])
 
-        for block_indices, block_desc in get_block_indices(args.model_name):
+        for block_indices, block_desc in get_block_indices(
+            args.model_name, e_range, inp
+        ):
             for layer in range(mt.num_layers):
                 block_config = block_indices(layer=layer, total_layers=mt.num_layers)
                 probs = trace_with_attn_blockage(mt.model, inp, block_config, answer_t)
