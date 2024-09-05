@@ -202,7 +202,7 @@ def get_block_indices(model_name, e_range, inp):
                 "attn",
                 "sentinel->non_subject",
             ),
-            (sentinel_token, [sentinel_token], "encoder", "sentinel->itself"),
+            (sentinel_token, [sentinel_token], "encoder", "attn", "sentinel->itself"),
             (
                 last_token,
                 [x for x in e_range],
