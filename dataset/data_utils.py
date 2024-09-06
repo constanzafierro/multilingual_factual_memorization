@@ -321,6 +321,10 @@ def is_trivial_or_diff_decode_tokenize(ex):
     ) or not tokens_match_after_decode_tokenize(ex)
 
 
+def is_trivial(ex):
+    is_trivial_example(ex["obj_label"], ex["query"])
+
+
 def get_memorized_dataset(
     dataset_name,
     language,
@@ -370,7 +374,7 @@ def get_memorized_dataset(
         sample_indices = rng.choice(len(ds), total, replace=False)
         ds_sample = ds.select(sample_indices)
         if resample_trivial:
-            condition_to_resample = is_trivial_example
+            condition_to_resample = is_trivial
             if filter_decode_tokenize_diff:
                 condition_to_resample = is_trivial_or_diff_decode_tokenize
             ds_sample_trivial = ds_sample.filter(lambda ex: condition_to_resample(ex))
