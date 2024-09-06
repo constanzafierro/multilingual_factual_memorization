@@ -322,7 +322,7 @@ def is_trivial_or_diff_decode_tokenize(ex):
 
 
 def is_trivial(ex):
-    is_trivial_example(ex["obj_label"], ex["query"])
+    return is_trivial_example(ex["obj_label"], ex["query"])
 
 
 def get_memorized_dataset(
