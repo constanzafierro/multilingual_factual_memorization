@@ -326,7 +326,10 @@ def main(args):
                     {
                         "block_desc": block_desc,
                         "layer": layer,
-                        "block_config": block_config,
+                        "block_config": {
+                            "_".join(module): blocks
+                            for module, blocks in block_config.items()
+                        },
                     }
                 )
     df = pd.DataFrame(results)
