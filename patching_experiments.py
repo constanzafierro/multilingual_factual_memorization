@@ -102,7 +102,7 @@ def patch_ex1_into_ex2(mt, ex1, ex2, num_layers, kind, window, token_to_patch="l
                 ntoks=[(token_idx_to_patch_from, token_idx_to_patch)],
                 ids_stack=ids_stack,
             )
-            probs, ranks, ranks_from_tokens, pred_token, entropy = [
+            probs, ranks, ranks_from_tokens, pred_token, pred_prob, entropy = [
                 r.detach().cpu() for r in results
             ]
             patches_results.append(
@@ -111,7 +111,9 @@ def patch_ex1_into_ex2(mt, ex1, ex2, num_layers, kind, window, token_to_patch="l
                     patch_probs=probs,
                     patch_ranks=ranks,
                     patch_ranks_tokens=ranks_from_tokens,
+                    # TODO: generate more tokens.
                     patch_pred_token=pred_token,
+                    patch_pred_prob=pred_prob,
                     patch_entropy=entropy,
                     patched_ids_from=ids_stack[0],
                     patched_tokens_from_to=(
