@@ -285,16 +285,6 @@ def _get_memorized_ds(dataset_name, eval_df_filename, tokenizer):
             tokenizer=tokenizer,
         )
     )
-    key = "decoder_" if "decoder_pred_with_special_tokens" in memorized_df else ""
-    len_before = len(ds)
-    ds = ds.filter(
-        # Check that the decoding and tokenization did not wrongly removed some
-        # necessary tokens for obtaining the exact same precition.
-        lambda ex: ex["raw_pred_token_ids"][: len(ex[f"{key}input_ids"])]
-        == ex[f"{key}input_ids"]
-    )
-    if wandb.run is not None:
-        wandb.run.summary["tokenization_problem"] = len_before - len(ds)
     return ds
 
 
@@ -318,6 +308,19 @@ def filter_paraphrases(ds):
     )
 
 
+def tokens_match_after_decode_tokenize(ex):
+    key = "" if ex["decoder_input_ids"] is None else "decoder"
+    return (
+        ex["raw_pred_token_ids"][: len(ex[f"{key}input_ids"])] == ex[f"{key}input_ids"]
+    )
+
+
+def is_trivial_or_diff_decode_tokenize(ex):
+    return is_trivial_example(
+        ex["obj_label"], ex["query"]
+    ) or not tokens_match_after_decode_tokenize(ex)
+
+
 def get_memorized_dataset(
     dataset_name,
     language,
@@ -328,6 +331,7 @@ def get_memorized_dataset(
     filter_trivial=False,
     resample_trivial=False,
     keep_only_trivial=False,
+    filter_decode_tokenize_diff=True,
     log_to_wandb=True,
 ):
     eval_folder_glob = os.path.join(
@@ -366,13 +370,13 @@ def get_memorized_dataset(
         sample_indices = rng.choice(len(ds), total, replace=False)
         ds_sample = ds.select(sample_indices)
         if resample_trivial:
-            ds_sample_trivial = ds_sample.filter(
-                lambda ex: is_trivial_example(ex["obj_label"], ex["query"])
-            )
+            condition_to_resample = is_trivial_example
+            if filter_decode_tokenize_diff:
+                condition_to_resample = is_trivial_or_diff_decode_tokenize
+            ds_sample_trivial = ds_sample.filter(lambda ex: condition_to_resample(ex))
             sample_indices = set(sample_indices)
             non_trivial_non_selected_ds = ds.filter(
-                lambda ex, i: i not in sample_indices
-                and not is_trivial_example(ex["obj_label"], ex["query"]),
+                lambda ex, i: i not in sample_indices and not condition_to_resample(ex),
                 with_indices=True,
             )
             extra_sample = non_trivial_non_selected_ds.select(
@@ -392,6 +396,13 @@ def get_memorized_dataset(
             )
         else:
             ds = ds_sample
+    if filter_decode_tokenize_diff:
+        # Check that the decoding and tokenization did not wrongly removed some
+        # necessary tokens for obtaining the exact same precition.
+        len_before = len(ds)
+        ds = ds.filter(tokens_match_after_decode_tokenize)
+        if wandb.run is not None:
+            wandb.run.summary["tokenization_problem"] = len_before - len(ds)
     if filter_trivial:
         ds = ds.filter(lambda ex: not is_trivial_example(ex["obj_label"], ex["query"]))
     if keep_only_trivial:
