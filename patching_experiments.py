@@ -163,7 +163,48 @@ def get_xlingual_mem_ids(ds, ds_other):
     ]
 
 
-def get_last_token_experiment_ids(ds, ds_other):
+def get_diff_subj_same_relation_ids(ds, ds_other):
+    source_r_to_subjects = collections.defaultdict(list)
+    target_r_to_subjects = collections.defaultdict(list)
+    for ex in ds:
+        source_r_to_subjects[ex["relation"]].append(ex["sub_uri"])
+    for ex in ds_other:
+        target_r_to_subjects[ex["relation"]].append(ex["sub_uri"])
+    data = []
+    for relation, subjects in source_r_to_subjects.items():
+        data.append(
+            {
+                "relation": relation,
+                "source_subjects": subjects,
+                "target_subjects": target_r_to_subjects[relation],
+            }
+        )
+    df = pd.DataFrame(data)
+    df["combinations"] = df.apply(
+        lambda row: [
+            pair
+            for pair in product(row["source_subjects"], row["target_subjects"])
+            if pair[0] != pair[1]
+        ],
+        axis=1,
+    )
+    relation_subj_pairs = df[df.combinations.astype(bool)][
+        ["relation", "combinations"]
+    ].values
+    langs = [ds[0]["language"], ds_other[0]["language"]]
+    examples_ids = []
+    for relation, subj_pairs in relation_subj_pairs:
+        for subj_source, subj_target in subj_pairs:
+            examples_ids.append(
+                (
+                    f"{langs[0]}_{relation}_{subj_source}",
+                    f"{langs[1]}_{relation}_{subj_target}",
+                )
+            )
+    return examples_ids
+
+
+def get_same_subj_diff_relation_ids(ds, ds_other):
     source_subj_to_relations = collections.defaultdict(list)
     target_subj_to_relations = collections.defaultdict(list)
     for ex in ds:
@@ -263,10 +304,18 @@ def main(args):
         if args.token_to_patch == "last_subject_token":
             ids_to_patch = get_xlingual_mem_ids(ds, ds_other)
         elif args.token_to_patch == "last":
-            ids_to_patch = get_last_token_experiment_ids(ds, ds_other)
+            ids_to_patch = get_same_subj_diff_relation_ids(ds, ds_other)
+        elif args.token_to_patch == "last_diff_subj_same_relation":
+            ids_to_patch = get_diff_subj_same_relation_ids(ds, ds_other)
         elif args.token_to_patch == "last_same_ex":
             ids_to_patch = get_xlingual_mem_ids(ds, ds_other)
             token_to_patch = "last"
+        if args.max_examples and len(ids_to_patch) > args.max_examples:
+            rng = np.random.default_rng(0)
+            sample_indices = rng.choice(
+                len(ids_to_patch), args.max_examples, replace=False
+            )
+            ids_to_patch = [ids_to_patch[i] for i in sample_indices]
 
         counts[f"patched_examples/{lang}"] = len(ids_to_patch)
         for ex_id_source, ex_id_target in tqdm(ids_to_patch, desc="Examples"):
@@ -301,54 +350,29 @@ def main(args):
 
 if __name__ == "__main__":
     parser = argparse.ArgumentParser()
-    parser.add_argument(
-        "--model_name_or_path",
-        required=True,
-        type=str,
-        help="",
-    )
-    parser.add_argument(
-        "--model_name",
-        type=str,
-        default=None,
-        help="",
-    )
-    parser.add_argument(
-        "--output_folder",
-        required=True,
-        type=str,
-        help="",
-    )
-    parser.add_argument(
-        "--eval_dir",
-        type=str,
-        help="",
-    )
-    parser.add_argument(
-        "--kind",
-        type=str,
-        default=None,
-    )
-    parser.add_argument(
-        "--language",
-        type=str,
-        help="",
-    )
-    parser.add_argument(
-        "--languages_to_patch",
-        nargs="+",
-        help="",
-    )
+    parser.add_argument("--model_name_or_path", required=True, type=str, help="")
+    parser.add_argument("--model_name", type=str, default=None, help="")
+    parser.add_argument("--output_folder", required=True, type=str, help="")
+    parser.add_argument("--eval_dir", type=str, help="")
+    parser.add_argument("--kind", type=str, default=None)
+    parser.add_argument("--language", type=str, help="")
+    parser.add_argument("--languages_to_patch", nargs="+", help="")
     parser.add_argument("--only_subset", action="store_true")
     parser.add_argument("--filter_trivial", action="store_true")
     parser.add_argument("--keep_only_trivial", action="store_true")
     parser.add_argument("--resample_trivial", action="store_true")
     parser.add_argument("--override_results", action="store_true")
     parser.add_argument("--patch_k_layers", type=int, default=10)
+    parser.add_argument("--max_examples", type=int, default=1000)
     parser.add_argument(
         "--token_to_patch",
         type=str,
-        choices=["last", "last_subject_token", "last_same_ex"],
+        choices=[
+            "last",
+            "last_subject_token",
+            "last_same_ex",
+            "last_diff_subj_same_relation",
+        ],
         default=None,
     )
     args = parser.parse_args()
