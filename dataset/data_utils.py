@@ -309,7 +309,7 @@ def filter_paraphrases(ds):
 
 
 def tokens_match_after_decode_tokenize(ex):
-    key = "" if ex["decoder_input_ids"] is None else "decoder"
+    key = "" if ex["decoder_input_ids"] is None else "decoder_"
     return (
         ex["raw_pred_token_ids"][: len(ex[f"{key}input_ids"])] == ex[f"{key}input_ids"]
     )
