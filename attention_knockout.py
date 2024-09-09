@@ -1,4 +1,5 @@
 import argparse
+import collections
 import functools
 import json
 import os
@@ -166,7 +167,7 @@ def get_output_dir(args):
     return output_folder
 
 
-def get_block_indices(model_name, e_range, inp):
+def get_block_indices(model_name, subject_indices, inp):
     def get_block_config(
         block_from, block_indices, layer, total_layers, stack="encoder", kind="attn"
     ):
@@ -185,10 +186,10 @@ def get_block_indices(model_name, e_range, inp):
     if "t5" not in model_name:
         last_token = input_ids_count - 1
         block_indices_desc = [
-            ([x for x in e_range], "subject"),
-            ([e_range[-1]], "last_subject"),
+            ([x for x in subject_indices], "subject"),
+            ([subject_indices[-1]], "last_subject"),
             (
-                [x for x in range(input_ids_count - 1) if x not in e_range],
+                [x for x in range(input_ids_count - 1) if x not in subject_indices],
                 "non-subject",
             ),
             ([last_token], "last"),
@@ -207,18 +208,21 @@ def get_block_indices(model_name, e_range, inp):
     else:
         decoder_ids_count = inp["decoder_input_ids"].shape[1]
         last_token = decoder_ids_count - 1
-        sentinel_token = (inp["input_ids"][0] == 250099).nonzero().item()
+        sentinel_token = (inp["input_ids"][0] == 250099).nonzero()
+        if len(sentinel_token) == 0:
+            return None
+        sentinel_token = sentinel_token.item()
         block_indices_desc = [
             (
                 sentinel_token,
-                [x for x in e_range],
+                [x for x in subject_indices],
                 "encoder",
                 "attn",
                 "sentinel->subject",
             ),
             (
                 sentinel_token,
-                [x for x in range(input_ids_count - 1) if x not in e_range],
+                [x for x in range(input_ids_count - 1) if x not in subject_indices],
                 "encoder",
                 "attn",
                 "sentinel->non_subject",
@@ -226,14 +230,14 @@ def get_block_indices(model_name, e_range, inp):
             (sentinel_token, [sentinel_token], "encoder", "attn", "sentinel->itself"),
             (
                 last_token,
-                [x for x in e_range],
+                [x for x in subject_indices],
                 "decoder",
                 "cross_attn",
                 "last->subject",
             ),
             (
                 last_token,
-                [x for x in range(input_ids_count - 1) if x not in e_range],
+                [x for x in range(input_ids_count - 1) if x not in subject_indices],
                 "decoder",
                 "cross_attn",
                 "last->non_subject",
@@ -281,6 +285,7 @@ def main(args):
     # Run attention knockouts
     results = []
     block_configs = []
+    run_metrics = collections.defaultdict(int)
     for ex in tqdm(ds, desc="Examples"):
         ex_id = ex["id"]
         input_prompt = ex["query_inference"]
@@ -291,10 +296,10 @@ def main(args):
             decoder_input_ids = torch.tensor([ex["decoder_input_ids"]]).to(device)
             inp = {**inp, "decoder_input_ids": decoder_input_ids}
 
-        e_range = find_token_range(
+        subject_range = find_token_range(
             mt.tokenizer, inp["input_ids"][0], subject, input_prompt
         )
-        e_range = list(range(e_range[0], e_range[1]))
+        subject_indices = list(range(subject_range[0], subject_range[1]))
         is_subject_position_zero = input_prompt.startswith(subject)
 
         answer_t, base_score = [d[0] for d in predict_from_input(mt.model, inp)]
@@ -302,11 +307,15 @@ def main(args):
         [answer] = decode_tokens(mt.tokenizer, [answer_t])
         assert ex["prediction"].startswith(answer), ex["id"]
 
-        for block_indices, block_desc in get_block_indices(
-            args.model_name, e_range, inp
-        ):
+        indices_to_block = get_block_indices(args.model_name, subject_indices, inp)
+        if not indices_to_block:
+            run_metrics["skipped_examples"] += 1
+            continue
+        for block_indices_func, block_desc in indices_to_block:
             for layer in range(mt.num_layers):
-                block_config = block_indices(layer=layer, total_layers=mt.num_layers)
+                block_config = block_indices_func(
+                    layer=layer, total_layers=mt.num_layers
+                )
                 probs = trace_with_attn_blockage(mt.model, inp, block_config, answer_t)
                 new_score = probs.cpu().item()
                 results.append(
@@ -339,6 +348,7 @@ def main(args):
         json.dump(args.__dict__, f, indent=2)
     with open(os.path.join(output_folder, "block_configs.json"), "w") as f:
         json.dump(block_configs, f)
+    wandb.log(run_metrics)
 
 
 if __name__ == "__main__":
