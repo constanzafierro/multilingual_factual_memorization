@@ -336,8 +336,8 @@ def main(args):
                         "block_desc": block_desc,
                         "layer": layer,
                         "block_config": {
-                            "_".join(module): blocks
-                            for module, blocks in block_config.items()
+                            "_".join([str(module_spec) for m in module_spec]): blocks
+                            for module_spec, blocks in block_config.items()
                         },
                     }
                 )
