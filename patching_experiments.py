@@ -105,7 +105,7 @@ def patch_ex1_into_ex2(
                 noise=None,
                 ntoks=[(token_idx_to_patch_from, token_idx_to_patch)],
                 ids_stack=ids_stack,
-                generate_n_tokens=args.generate_n_tokens,
+                generate_n_tokens=generate_n_tokens,
             )
             probs, ranks, ranks_from_tokens, pred_token, pred_prob, entropy = [
                 r.detach().cpu() for r in results
