@@ -82,9 +82,9 @@ def trace_with_patch(
         ranks = torch.tensor(ranks[1])  # The first position only contains 0s.
 
         entropy = -torch.sum(probs * torch.log(probs + 1e-10))
-        probs = probs[:, answers_t]
         pred_token = torch.tensor(sort_ind[0][0])
         pred_prob = probs[:, pred_token.item()]
+        probs = probs[:, answers_t]
         return probs, ranks, ranks_from_tokens, pred_token, pred_prob, entropy
 
     # If tracing all layers, collect all activations together to return.
