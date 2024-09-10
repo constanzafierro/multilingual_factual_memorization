@@ -27,7 +27,7 @@ def get_token_indices_patches(token_to_patch, examples, inp, input_prompts, toke
                 (
                     token_idx_to_patch_from,
                     token_idx_to_patch,
-                    ("input_ids", "encoder"),
+                    [("input_ids", "encoder")],
                 )
             ]
         sentinel_token_0 = (inp["input_ids"][0] == 250099).nonzero().item()
@@ -37,7 +37,7 @@ def get_token_indices_patches(token_to_patch, examples, inp, input_prompts, toke
             (
                 token_idx_to_patch_from,
                 token_idx_to_patch,
-                ("decoder_input_ids", "decoder"),
+                [("decoder_input_ids", "decoder")],
             ),
         ]
     elif token_to_patch == "last_subject_token":
@@ -48,7 +48,9 @@ def get_token_indices_patches(token_to_patch, examples, inp, input_prompts, toke
             )
         token_idx_to_patch_from = subj_ranges[0][-1] - 1
         token_idx_to_patch = subj_ranges[1][-1] - 1
-        return [(token_idx_to_patch_from, token_idx_to_patch, ("input_ids", "encoder"))]
+        return [
+            (token_idx_to_patch_from, token_idx_to_patch, [("input_ids", "encoder")])
+        ]
 
 
 def patch_ex1_into_ex2(mt, ex1, ex2, num_layers, kind, window, token_to_patch="last"):
