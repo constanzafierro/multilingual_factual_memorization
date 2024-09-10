@@ -307,6 +307,7 @@ def main(args):
             ids_to_patch = get_same_subj_diff_relation_ids(ds, ds_other)
         elif args.token_to_patch == "last_diff_subj_same_relation":
             ids_to_patch = get_diff_subj_same_relation_ids(ds, ds_other)
+            token_to_patch = "last"
         elif args.token_to_patch == "last_same_ex":
             ids_to_patch = get_xlingual_mem_ids(ds, ds_other)
             token_to_patch = "last"
