@@ -15,6 +15,7 @@ def trace_with_patch(
     tokens_to_mix,  # Range of tokens to corrupt (begin, end)
     noise=0.1,  # Level of noise to add
     trace_layers=None,  # List of traced outputs to return
+    generate_n_tokens=1,
 ):
     """The first example in the batch is used for patching in all the subsequent examples.
     The probability is tracked over the mean of all the subsequent examples.
@@ -64,7 +65,10 @@ def trace_with_patch(
         edit_output=patch_rep,
     ) as td:
         outputs_exp = model.generate(
-            **inp, max_new_tokens=1, output_logits=True, return_dict_in_generate=True
+            **inp,
+            max_new_tokens=generate_n_tokens,
+            output_logits=True,
+            return_dict_in_generate=True
         )
 
     # We report softmax probabilities for the answers_t token predictions of interest.
@@ -75,17 +79,28 @@ def trace_with_patch(
             answers_t
         ]
     else:
-        probs = torch.softmax(outputs_exp.logits[-1][1:, :], dim=1)
-        sort_ind = np.argsort(-probs.detach().cpu().numpy(), axis=-1)
+        probs_first_token = torch.softmax(outputs_exp.logits[0][1:, :], dim=1)
+        sort_ind = np.argsort(-probs_first_token.detach().cpu().numpy(), axis=-1)
         ranks = np.where(np.isin(sort_ind, answers_t.detach().cpu().numpy()))
         ranks_from_tokens = torch.tensor(sort_ind[ranks])
         ranks = torch.tensor(ranks[1])  # The first position only contains 0s.
-
-        entropy = -torch.sum(probs * torch.log(probs + 1e-10))
-        pred_token = torch.tensor(sort_ind[0][0])
-        pred_prob = probs[:, pred_token.item()]
-        probs = probs[:, answers_t]
-        return probs, ranks, ranks_from_tokens, pred_token, pred_prob, entropy
+        entropy = -torch.sum(probs_first_token * torch.log(probs_first_token + 1e-10))
+        probs_answer_t = probs_first_token[:, answers_t]
+        # pred_token = torch.tensor(sort_ind[0][0])
+        # pred_prob = probs[:, pred_token.item()]
+        i_probs = torch.cat(
+            [outputs_exp.logits[i] for i in range(generate_n_tokens)], 0
+        )
+        i_probs = torch.softmax(i_probs, dim=1)
+        pred_probs, pred_tokens = torch.max(i_probs, dim=1)
+        return (
+            probs_answer_t,
+            ranks,
+            ranks_from_tokens,
+            pred_tokens,
+            pred_probs,
+            entropy,
+        )
 
     # If tracing all layers, collect all activations together to return.
     if trace_layers is not None:
@@ -98,7 +113,15 @@ def trace_with_patch(
 
 
 def trace_important_states(
-    model, num_layers, inp, e_range, answer_t, noise=0.1, ntoks=None, ids_stack=None
+    model,
+    num_layers,
+    inp,
+    e_range,
+    answer_t,
+    noise=0.1,
+    ntoks=None,
+    ids_stack=None,
+    generate_n_tokens=1,
 ):
     """Copy of the function in causal_trace.ipynb"""
     table = []
@@ -120,6 +143,7 @@ def trace_important_states(
                     answer_t,
                     tokens_to_mix=e_range,
                     noise=noise,
+                    generate_n_tokens=generate_n_tokens,
                 )
                 row.append(r)
             if noise:

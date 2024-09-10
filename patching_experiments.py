@@ -53,7 +53,9 @@ def get_token_indices_patches(token_to_patch, examples, inp, input_prompts, toke
         ]
 
 
-def patch_ex1_into_ex2(mt, ex1, ex2, num_layers, kind, window, token_to_patch="last"):
+def patch_ex1_into_ex2(
+    mt, ex1, ex2, num_layers, kind, window, token_to_patch="last", generate_n_tokens=1
+):
     "Patch the repr from ex1 into the forward pass of ex2."
     device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
     input_prompts = []
@@ -103,6 +105,7 @@ def patch_ex1_into_ex2(mt, ex1, ex2, num_layers, kind, window, token_to_patch="l
                 noise=None,
                 ntoks=[(token_idx_to_patch_from, token_idx_to_patch)],
                 ids_stack=ids_stack,
+                generate_n_tokens=args.generate_n_tokens,
             )
             probs, ranks, ranks_from_tokens, pred_token, pred_prob, entropy = [
                 r.detach().cpu() for r in results
@@ -264,6 +267,9 @@ def main(args):
         data_id += "_only_trivial"
     if args.patch_k_layers != 10:
         data_id += f"_window={args.patch_k_layers}"
+    if args.generate_n_tokens != 1:
+        wandb.run.name += f" generate={args.generate_n_tokens}"
+        data_id += f"_generate={args.generate_n_tokens}"
     output_folder = os.path.join(args.output_folder, args.model_name, data_id)
     wandb.config["final_output_folder"] = output_folder
     os.makedirs(output_folder, exist_ok=True)
@@ -334,6 +340,7 @@ def main(args):
                     kind=args.kind,
                     window=args.patch_k_layers,
                     token_to_patch=token_to_patch,
+                    generate_n_tokens=args.generate_n_tokens,
                 )
                 numpy_result = {
                     k: v.detach().cpu().numpy() if torch.is_tensor(v) else v
@@ -367,6 +374,7 @@ if __name__ == "__main__":
     parser.add_argument("--override_results", action="store_true")
     parser.add_argument("--patch_k_layers", type=int, default=10)
     parser.add_argument("--max_examples", type=int, default=1000)
+    parser.add_argument("--generate_n_tokens", type=int, default=1)
     parser.add_argument(
         "--token_to_patch",
         type=str,
