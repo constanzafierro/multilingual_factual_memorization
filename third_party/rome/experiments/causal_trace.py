@@ -527,6 +527,7 @@ def layername(model, num=-1, kind=None, stack="encoder"):
             "embed": "shared",
             "lm_head": "lm_head",
             "layers": f"{stack}.block",
+            "lm_norm": "decoder.final_layer_norm"
         }
         if kind in kind_to_layer:
             return kind_to_layer[kind]

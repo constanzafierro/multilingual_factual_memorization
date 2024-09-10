@@ -83,6 +83,9 @@ def main(args):
     if args.last_subject_token:
         wandb.run.name += " last_subject_token"
         data_id += "_last_subject_token"
+    if args.apply_layer_norm:
+        wandb.run.name += " apply_layer_norm"
+        data_id += "_apply_layer_norm"
     if args.store_topk:
         wandb.run.name = f"(top{args.store_topk}) {wandb.run.name}"
         args.output_folder = os.path.normpath(args.output_folder)
@@ -101,6 +104,11 @@ def main(args):
 
     total_layers = len(get_module(model, layername(model, kind="layers")))
     lm_head = get_module(model, layername(model, kind="lm_head")).weight
+    layer_norm = (
+        None
+        if not args.apply_layer_norm
+        else get_module(model, layername(model, kind="lm_norm"))
+    )
 
     dataset_name = get_dataset_name(args.model_name, args.language)
     ds = get_memorized_dataset(
@@ -152,6 +160,8 @@ def main(args):
         for layer in range(total_layers):
             for k in args.hook_modules:
                 out = model.activations_[f"{k}_{layer}"][0]
+                if layer_norm is not None:
+                    out = layer_norm(out).detach()
                 proj = (lm_head @ out).detach().cpu().numpy()
                 ind = np.argsort(-proj, axis=-1)  # Descending order.
                 pred_tok_rank = np.where(ind == token_pred)[0][0]
@@ -211,7 +221,7 @@ def main(args):
     df[["proj_vec", "language", "relation", "layer", "pred_in_top_1"]].groupby(
         by=["proj_vec", "language", "relation", "layer"], as_index=False
     ).mean().to_csv(
-        os.path.join(args.output_folder, f"extraction_events_avg_relation.csv"),
+        os.path.join(args.output_folder, "extraction_events_avg_relation.csv"),
         index=False,
     )
 
@@ -230,6 +240,7 @@ if __name__ == "__main__":
         type=str,
         help="",
     )
+    parser.add_argument("--apply_layer_norm", action="store_true")
     parser.add_argument("--only_subset", action="store_true")
     parser.add_argument("--filter_trivial", action="store_true")
     parser.add_argument("--keep_only_trivial", action="store_true")
