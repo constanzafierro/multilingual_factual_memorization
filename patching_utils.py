@@ -26,10 +26,9 @@ def trace_with_patch(
     for t, l in states_to_patch:
         patch_spec[l].append(t)
     embed_layername = layername(model, 0, "embed")
-    if "decoder_input_ids" in inp:
-        # The encoder and decoder share the embedding layer so we need to check
-        # whether we have the encoder input to perform the noise addition.
-        encoder_input_shape = inp["input_ids"].shape[-1]
+    # The encoder and decoder share the embedding layer so we need to check
+    # whether we have the encoder input to perform the noise addition.
+    input_ids_length = inp["input_ids"].shape[-1]
 
     def untuple(x):
         return x[0] if isinstance(x, tuple) else x
@@ -37,7 +36,7 @@ def trace_with_patch(
     # Define the model-patching rule.
     def patch_rep(x, layer):
         if layer == embed_layername and (
-            "decoder_input_ids" not in inp or x.shape[1] == encoder_input_shape
+            "decoder_input_ids" not in inp or x.shape[1] == input_ids_length
         ):
             # If requested, we corrupt a range of token embeddings on batch items x[1:]
             if tokens_to_mix is not None:
@@ -46,11 +45,17 @@ def trace_with_patch(
                     prng.randn(x.shape[0] - 1, e - b, x.shape[2])
                 ).to(x.device)
             return x
+        print(layer)
         if layer not in patch_spec:
             return x
+        h = untuple(x)
+        # We only patch the first token being generated, after that the cached
+        # computation is used.
+        if generate_n_tokens > 1 and x.shape[1] != input_ids_length:
+            return x
+        print("> patching")
         # If this layer is in the patch_spec, restore the uncorrupted hidden state
         # for selected tokens.
-        h = untuple(x)
         for t in patch_spec[layer]:
             if isinstance(t, tuple):
                 h[1:, t[1]] = h[0, t[0]]
@@ -89,7 +94,7 @@ def trace_with_patch(
         probs_answer_t = probs_first_token[:, answers_t]
         i_probs = torch.cat(
             [
-                outputs_exp.logits[i]
+                outputs_exp.logits[i][1:]
                 for i in range(min(generate_n_tokens, len(outputs_exp.logits)))
             ],
             0,

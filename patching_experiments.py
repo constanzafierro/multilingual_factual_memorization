@@ -334,10 +334,10 @@ def main(args):
                     k: v.detach().cpu().numpy() if torch.is_tensor(v) else v
                     for k, v in result.items()
                 }
-                result["source_lang"] = args.language
-                result["target_lang"] = lang
-                result["ex_id_source"] = ex_id_source
-                result["ex_id_target"] = ex_id_target
+                numpy_result["source_lang"] = args.language
+                numpy_result["target_lang"] = lang
+                numpy_result["ex_id_source"] = ex_id_source
+                numpy_result["ex_id_target"] = ex_id_target
                 np.savez(filename, **numpy_result)
     wandb.log({k: c for k, c in counts.items()})
 
