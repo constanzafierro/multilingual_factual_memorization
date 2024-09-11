@@ -12,7 +12,7 @@ from tqdm import tqdm
 
 from dataset.data_utils import find_token_range, get_dataset_name, get_memorized_dataset
 from model_utils import load_model_and_tok
-from patching_utils import trace_important_states
+from patching_utils import trace_important_states_swap
 from third_party.rome.experiments.causal_trace import (
     decode_tokens,
 )
@@ -93,33 +93,21 @@ def patch_ex1_into_ex2(
     assert ex1["prediction"].startswith(answers[0]), ex1["id"]
     assert ex2["prediction"].startswith(answers[1]), ex2["id"]
     patches_results = []
-    # TODO: should we patch the subject on a window?
     if kind is None:
         for token_idx_to_patch_from, token_idx_to_patch, ids_stack in patches:
-            results = trace_important_states(
+            results = trace_important_states_swap(
                 mt.model,
                 num_layers,
                 inp,
-                e_range=None,
                 answer_t=preds_tokens,
-                noise=None,
-                ntoks=[(token_idx_to_patch_from, token_idx_to_patch)],
+                patch_token_from_to=[(token_idx_to_patch_from, token_idx_to_patch)],
                 ids_stack=ids_stack,
                 generate_n_tokens=generate_n_tokens,
             )
-            probs, ranks, ranks_from_tokens, pred_token, pred_prob, entropy = [
-                r.detach().cpu() for r in results
-            ]
             patches_results.append(
                 dict(
                     # The probability of getting each of the answers.
-                    patch_probs=probs,
-                    patch_ranks=ranks,
-                    patch_ranks_tokens=ranks_from_tokens,
-                    # TODO: generate more tokens.
-                    patch_pred_token=pred_token,
-                    patch_pred_prob=pred_prob,
-                    patch_entropy=entropy,
+                    **results,
                     patched_ids_from=ids_stack[0],
                     patched_tokens_from_to=(
                         token_idx_to_patch_from,
@@ -146,7 +134,7 @@ def patch_ex1_into_ex2(
         base_entropies=base_entropies,
         window=window,
         kind=kind or "",
-        results=patches_results,
+        patch_results=patches_results,
     )
 
 

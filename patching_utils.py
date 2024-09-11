@@ -1,3 +1,4 @@
+import collections
 from collections import defaultdict
 
 import numpy as np
@@ -86,8 +87,6 @@ def trace_with_patch(
         ranks = torch.tensor(ranks[1])  # The first position only contains 0s.
         entropy = -torch.sum(probs_first_token * torch.log(probs_first_token + 1e-10))
         probs_answer_t = probs_first_token[:, answers_t]
-        # pred_token = torch.tensor(sort_ind[0][0])
-        # pred_prob = probs[:, pred_token.item()]
         i_probs = torch.cat(
             [
                 outputs_exp.logits[i]
@@ -97,13 +96,13 @@ def trace_with_patch(
         )
         i_probs = torch.softmax(i_probs, dim=1)
         pred_probs, pred_tokens = torch.max(i_probs, dim=1)
-        return (
-            probs_answer_t,
-            ranks,
-            ranks_from_tokens,
-            pred_tokens,
-            pred_probs,
-            entropy,
+        return dict(
+            probs_answer_tokens=probs_answer_t,
+            ranks_answer_tokens=ranks,
+            ranks_from_token=ranks_from_tokens,
+            entropy_first_token=entropy,
+            pred_tokens=pred_tokens,
+            pred_probs=pred_probs,
         )
 
     # If tracing all layers, collect all activations together to return.
@@ -156,6 +155,34 @@ def trace_important_states(
                 for i in range(len(row[0])):
                     table.append(torch.stack([r[i] for r in row]))
     return torch.stack(table) if noise else table
+
+
+def trace_important_states_swap(
+    model,
+    num_layers,
+    inp,
+    answer_t,
+    patch_token_from_to,
+    ids_stack=None,
+    generate_n_tokens=1,
+):
+    results = collections.defaultdict(list)
+    if not ids_stack:
+        ids_stack = [("input_ids", "encoder"), ("decoder_input_ids", "decoder")]
+    for ids_key, stack in ids_stack:
+        if ids_key not in inp:
+            continue
+        for layer in range(0, num_layers):
+            layer_results = trace_with_patch(
+                model,
+                inp,
+                [(patch_token_from_to, layername(model, stack=stack, num=layer))],
+                answer_t,
+                generate_n_tokens=generate_n_tokens,
+            )
+            for k, v in layer_results.items():
+                results[k].append(v.detach().cpu().numpy())
+    return results
 
 
 def trace_important_window(
