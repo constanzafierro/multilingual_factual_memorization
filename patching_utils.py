@@ -89,7 +89,11 @@ def trace_with_patch(
         # pred_token = torch.tensor(sort_ind[0][0])
         # pred_prob = probs[:, pred_token.item()]
         i_probs = torch.cat(
-            [outputs_exp.logits[i] for i in range(generate_n_tokens)], 0
+            [
+                outputs_exp.logits[i]
+                for i in range(min(generate_n_tokens, len(outputs_exp.logits)))
+            ],
+            0,
         )
         i_probs = torch.softmax(i_probs, dim=1)
         pred_probs, pred_tokens = torch.max(i_probs, dim=1)
