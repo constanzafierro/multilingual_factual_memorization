@@ -178,6 +178,7 @@ def trace_important_states_swap(
                 inp,
                 [(patch_token_from_to, layername(model, stack=stack, num=layer))],
                 answer_t,
+                tokens_to_mix=None,
                 generate_n_tokens=generate_n_tokens,
             )
             for k, v in layer_results.items():
