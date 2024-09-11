@@ -45,15 +45,13 @@ def trace_with_patch(
                     prng.randn(x.shape[0] - 1, e - b, x.shape[2])
                 ).to(x.device)
             return x
-        print(layer)
         if layer not in patch_spec:
             return x
         h = untuple(x)
         # We only patch the first token being generated, after that the cached
         # computation is used.
-        if generate_n_tokens > 1 and x.shape[1] != input_ids_length:
+        if generate_n_tokens > 1 and h.shape[1] != input_ids_length:
             return x
-        print("> patching")
         # If this layer is in the patch_spec, restore the uncorrupted hidden state
         # for selected tokens.
         for t in patch_spec[layer]:
