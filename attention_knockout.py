@@ -9,6 +9,7 @@ import pandas as pd
 import torch
 import wandb
 from tqdm import tqdm
+from transformers import MT5ForConditionalGeneration
 
 from dataset.data_utils import find_token_range, get_dataset_name, get_memorized_dataset
 from model_utils import load_model_and_tok
@@ -108,7 +109,13 @@ def set_block_attn_hooks(model, attn_layer_to_blockage):
 
         return wrapper_fn
 
+    def position_bias_to_None(module, input, output):
+        output = list(output)
+        output[2] = None
+        return tuple(output)
+
     hooks = []
+    output_hooks = []
     for (stack, layer, kind), blockage in attn_layer_to_blockage.items():
         module_to_hook = get_module(
             model, layername(model, num=layer, stack=stack, kind=kind)
@@ -120,8 +127,15 @@ def set_block_attn_hooks(model, attn_layer_to_blockage):
             blockage,
         )
         hooks.append((layer, stack, kind, hook))
+        if isinstance(model, MT5ForConditionalGeneration):
+            output_hooks.append(
+                get_module(
+                    model,
+                    layername(model=model, num=layer, kind=kind, stack=stack),
+                ).register_forward_hook(position_bias_to_None)
+            )
 
-    return hooks
+    return hooks, output_hooks
 
 
 def trace_with_attn_blockage(
@@ -133,13 +147,14 @@ def trace_with_attn_blockage(
     """Forward pass with source attn being blocked to the target."""
     with torch.no_grad():
         # set hooks
-        block_attn_hooks = set_block_attn_hooks(model, block_config)
+        block_attn_hooks, output_edit_hooks = set_block_attn_hooks(model, block_config)
 
         # get prediction
         outputs_exp = model(**inp)
 
         # remove hooks
         remove_wrapper(model, block_attn_hooks)
+        remove_hooks(output_edit_hooks)
 
     probs = torch.softmax(outputs_exp.logits[0, -1, :], dim=0)[answers_t]
 
