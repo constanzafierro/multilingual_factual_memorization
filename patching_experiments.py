@@ -280,7 +280,7 @@ def main(args):
     id_to_ex1 = {ex["id"][: ex["id"].rfind("_")]: ex for ex in ds}
     counts = collections.defaultdict(int)
     for lang in tqdm(args.languages_to_patch, desc="Languages"):
-        if lang == args.language:
+        if lang == args.language and not args.allow_same_lang_patch:
             continue
         dataset_name = get_dataset_name(args.model_name, lang)
         ds_other = get_memorized_dataset(
@@ -360,6 +360,7 @@ if __name__ == "__main__":
     parser.add_argument("--keep_only_trivial", action="store_true")
     parser.add_argument("--resample_trivial", action="store_true")
     parser.add_argument("--override_results", action="store_true")
+    parser.add_argument("--allow_same_lang_patch", action="store_true")
     parser.add_argument("--patch_k_layers", type=int, default=10)
     parser.add_argument("--max_examples", type=int, default=1000)
     parser.add_argument("--generate_n_tokens", type=int, default=1)
