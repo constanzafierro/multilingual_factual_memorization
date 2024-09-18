@@ -405,6 +405,7 @@ if __name__ == "__main__":
             "last_subject_token",
             "last_same_ex",
             "last_diff_subj_same_relation",
+            "last_all_diff",
         ],
         default=None,
     )
