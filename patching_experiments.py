@@ -2,7 +2,7 @@ import argparse
 import collections
 import json
 import os
-from itertools import product
+from itertools import product, permutations
 
 import numpy as np
 import pandas as pd
@@ -157,6 +157,7 @@ def get_xlingual_mem_ids(ds, ds_other):
 
 
 def get_diff_subj_same_relation_ids(ds, ds_other):
+    # TODO: do we have repeated examples?
     source_r_to_subjects = collections.defaultdict(list)
     target_r_to_subjects = collections.defaultdict(list)
     for ex in ds:
@@ -194,6 +195,33 @@ def get_diff_subj_same_relation_ids(ds, ds_other):
                     f"{langs[1]}_{relation}_{subj_target}",
                 )
             )
+    return examples_ids
+
+
+def get_diff_subj_diff_relation_ids(ds, ds_other):
+    source_r_to_subjects = collections.defaultdict(set)
+    target_r_to_subjects = collections.defaultdict(set)
+    for ex in ds:
+        source_r_to_subjects[ex["relation"]].add(ex["sub_uri"])
+    for ex in ds_other:
+        target_r_to_subjects[ex["relation"]].add(ex["sub_uri"])
+    relations = []
+    for relation, subjects in source_r_to_subjects.items():
+        if len(subjects) > 0 and len(target_r_to_subjects[relation]) > 0:
+            relations.append(relation)
+    examples_ids = []
+    langs = [ds[0]["language"], ds_other[0]["language"]]
+    for r_source, r_target in list(permutations(relations, 2)):
+        for s_source, s_target in product(
+            source_r_to_subjects[r_source], target_r_to_subjects[r_target]
+        ):
+            if s_source != s_target:
+                examples_ids.append(
+                    (
+                        f"{langs[0]}_{r_source}_{s_source}",
+                        f"{langs[1]}_{r_target}_{s_target}",
+                    )
+                )
     return examples_ids
 
 
@@ -307,6 +335,11 @@ def main(args):
         elif args.token_to_patch == "last_same_ex":
             ids_to_patch = get_xlingual_mem_ids(ds, ds_other)
             token_to_patch = "last"
+        elif args.token_to_patch == "last_all_diff":
+            ids_to_patch = get_diff_subj_diff_relation_ids(ds, ds_other)
+            token_to_patch = "last"
+        counts[f"total_examples/{lang}"] = len(ids_to_patch)
+
         if args.max_examples and len(ids_to_patch) > args.max_examples:
             rng = np.random.default_rng(0)
             sample_indices = rng.choice(
