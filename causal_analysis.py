@@ -223,7 +223,8 @@ def agg_causal_analysis_results(tokenizer, ds, cache_output_dir, kind, missing_i
         last_subj_token = numpy_result["subject_range"][-1] - 1
         # Subject tokens scores.
         ex_scores["last_subj_token"].append(encoder_scores[last_subj_token])
-        ex_scores["first_subj_token"].append(encoder_scores[first_subj_token])
+        if first_subj_token != last_subj_token:
+            ex_scores["first_subj_token"].append(encoder_scores[first_subj_token])
         for i in range(first_subj_token + 1, last_subj_token):
             ex_scores["mid_subj_tokens"].append(encoder_scores[i])
         for i in range(first_subj_token, last_subj_token + 1):
