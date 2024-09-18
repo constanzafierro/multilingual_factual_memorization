@@ -81,6 +81,7 @@ def set_block_attn_hooks(model, attn_layer_to_blockage):
             # Encoder self attention or the decoder cross attention block.
             # First layer has no position_bias yet.
             elif kwargs["position_bias"] is None:
+                print("position_bias=None", kwargs[attention_mask_key].shape)
                 # Note that we assume that there is no padding, we assume the
                 # initial mask is just 1s.
                 attn_mask = torch.ones(
@@ -98,10 +99,11 @@ def set_block_attn_hooks(model, attn_layer_to_blockage):
                 attn_mask = (1.0 - attn_mask) * torch.finfo(model_.dtype).min
             else:
                 # The position_bias is (batch_size, num_heads, hidden_states_length, key_values_length)
+                print("position_bias is not None", kwargs[attention_mask_key].shape)
                 attn_mask = kwargs[attention_mask_key].detach().clone()
                 for s, t in from_to_index_:
                     attn_mask[:, :, s, t] = torch.finfo(model_.dtype).min
-
+            print("attn_mask.shape", attn_mask.shape)
             attn_mask = attn_mask.to(hs.device)
             new_kwargs[attention_mask_key] = attn_mask
 
@@ -109,9 +111,11 @@ def set_block_attn_hooks(model, attn_layer_to_blockage):
 
         return wrapper_fn
 
-    def position_bias_to_None(module, input, output):
+    def reset_position_bias(module, args, kwargs, output):
+        if kwargs["position_bias"] is None:
+            return
         output = list(output)
-        output[2] = None
+        output[2] = kwargs["position_bias"]
         return tuple(output)
 
     hooks = []
@@ -132,7 +136,7 @@ def set_block_attn_hooks(model, attn_layer_to_blockage):
                 get_module(
                     model,
                     layername(model=model, num=layer, kind=kind, stack=stack),
-                ).register_forward_hook(position_bias_to_None)
+                ).register_forward_hook(reset_position_bias, with_kwargs=True)
             )
 
     return hooks, output_hooks
@@ -223,26 +227,33 @@ def get_block_indices(model_name, subject_indices, inp):
     else:
         decoder_ids_count = inp["decoder_input_ids"].shape[1]
         last_token = decoder_ids_count - 1
-        sentinel_token = (inp["input_ids"][0] == 250099).nonzero()
-        if len(sentinel_token) == 0:
+        enc_sentinel_token = (inp["input_ids"][0] == 250099).nonzero()
+        if len(enc_sentinel_token) == 0:
             return None
-        sentinel_token = sentinel_token.item()
+        enc_sentinel_token = enc_sentinel_token.item()
+        dec_sentinel_token = (inp["decoder_input_ids"][0] == 250099).nonzero()
         block_indices_desc = [
             (
-                sentinel_token,
+                enc_sentinel_token,
                 [x for x in subject_indices],
                 "encoder",
                 "attn",
-                "sentinel->subject",
+                "enc_sentinel->subject",
             ),
             (
-                sentinel_token,
+                enc_sentinel_token,
                 [x for x in range(input_ids_count - 1) if x not in subject_indices],
                 "encoder",
                 "attn",
-                "sentinel->non_subject",
+                "enc_sentinel->non_subject",
             ),
-            (sentinel_token, [sentinel_token], "encoder", "attn", "sentinel->itself"),
+            (
+                enc_sentinel_token,
+                [enc_sentinel_token],
+                "encoder",
+                "attn",
+                "enc_sentinel->itself",
+            ),
             (
                 last_token,
                 [x for x in subject_indices],
@@ -264,7 +275,15 @@ def get_block_indices(model_name, subject_indices, inp):
                 "attn",
                 "last->decoder_tokens",
             ),
+            (
+                last_token,
+                [dec_sentinel_token],
+                "decoder",
+                "attn",
+                "last->dec_sentinel",
+            ),
             (last_token, [last_token], "decoder", "attn", "last->itself"),
+            # TODO: should we add dec_sentinel->subject/relation ?
         ]
         return [
             (
