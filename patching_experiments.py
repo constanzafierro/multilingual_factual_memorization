@@ -73,10 +73,10 @@ def patch_ex1_into_ex2(
         )
         decoder_input_ids[0, -len(ex1["decoder_input_ids"]) :] = torch.tensor(
             ex1["decoder_input_ids"]
-        )
+        ).to(device)
         decoder_input_ids[1, -len(ex2["decoder_input_ids"]) :] = torch.tensor(
             ex2["decoder_input_ids"]
-        )
+        ).to(device)
         inp["decoder_input_ids"] = decoder_input_ids
     patches = get_token_indices_patches(
         token_to_patch, [ex1, ex2], inp, input_prompts, mt.tokenizer
@@ -157,7 +157,6 @@ def get_xlingual_mem_ids(ds, ds_other):
 
 
 def get_diff_subj_same_relation_ids(ds, ds_other):
-    # TODO: do we have repeated examples?
     source_r_to_subjects = collections.defaultdict(list)
     target_r_to_subjects = collections.defaultdict(list)
     for ex in ds:
