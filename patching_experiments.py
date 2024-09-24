@@ -64,20 +64,25 @@ def patch_ex1_into_ex2(
     mt.tokenizer.padding_side = "left"
     inp = mt.tokenizer(input_prompts, return_tensors="pt", padding=True).to(device)
     if ex1["decoder_input_ids"] is not None:
-        max_len = max(
+        max_length = max(
             [len(i) for i in [ex1["decoder_input_ids"], ex2["decoder_input_ids"]]]
         )
         decoder_input_ids = (
-            torch.zeros(2, max_len, dtype=inp["input_ids"].dtype)
+            torch.zeros(2, max_length, dtype=inp["input_ids"].dtype)
             + mt.tokenizer.pad_token_id
-        ).to(device)
+        )
         decoder_input_ids[0, -len(ex1["decoder_input_ids"]) :] = torch.tensor(
             ex1["decoder_input_ids"]
-        ).to(device)
+        )
         decoder_input_ids[1, -len(ex2["decoder_input_ids"]) :] = torch.tensor(
             ex2["decoder_input_ids"]
-        ).to(device)
-        inp["decoder_input_ids"] = decoder_input_ids
+        )
+        inp["decoder_input_ids"] = decoder_input_ids.to(device)
+        inp["decoder_attention_mask"] = torch.ones_like(inp["decoder_input_ids"])
+        if len(ex1["decoder_input_ids"]) < max_length:
+            inp["decoder_attention_mask"][0, 0 : -len(ex1["decoder_input_ids"])] = 0
+        if len(ex2["decoder_input_ids"]) < max_length:
+            inp["decoder_attention_mask"][1, 0 : -len(ex2["decoder_input_ids"])] = 0
     patches = get_token_indices_patches(
         token_to_patch, [ex1, ex2], inp, input_prompts, mt.tokenizer
     )
