@@ -70,7 +70,7 @@ def patch_ex1_into_ex2(
         decoder_input_ids = (
             torch.zeros(2, max_len, dtype=inp["input_ids"].dtype)
             + mt.tokenizer.pad_token_id
-        )
+        ).to(device)
         decoder_input_ids[0, -len(ex1["decoder_input_ids"]) :] = torch.tensor(
             ex1["decoder_input_ids"]
         ).to(device)
