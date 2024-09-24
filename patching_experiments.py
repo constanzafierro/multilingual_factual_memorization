@@ -30,8 +30,16 @@ def get_token_indices_patches(token_to_patch, examples, inp, input_prompts, toke
                     [("input_ids", "encoder")],
                 )
             ]
-        sentinel_token_0 = (inp["input_ids"][0] == 250099).nonzero().item()
-        sentinel_token_1 = (inp["input_ids"][1] == 250099).nonzero().item()
+        sentinel_token_0 = (inp["input_ids"][0] == 250099).nonzero()
+        sentinel_token_1 = (inp["input_ids"][1] == 250099).nonzero()
+        if len(sentinel_token_0) == 0 or len(sentinel_token_1) == 0:
+            return (
+                token_idx_to_patch_from,
+                token_idx_to_patch,
+                [("decoder_input_ids", "decoder")],
+            )
+        sentinel_token_0 = sentinel_token_0.item()
+        sentinel_token_1 = sentinel_token_1.item()
         return [
             (sentinel_token_0, sentinel_token_1, [("input_ids", "encoder")]),
             (
