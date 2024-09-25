@@ -50,7 +50,11 @@ def trace_with_patch(
         h = untuple(x)
         # We only patch the first token being generated, after that the cached
         # computation is used.
-        if generate_n_tokens > 1 and h.shape[1] != input_ids_length:
+        if (
+            generate_n_tokens > 1
+            and "decoder_input_ids" not in inp
+            and h.shape[1] != input_ids_length
+        ):
             return x
         # If this layer is in the patch_spec, restore the uncorrupted hidden state
         # for selected tokens.
