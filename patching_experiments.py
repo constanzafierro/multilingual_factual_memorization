@@ -64,7 +64,15 @@ def get_token_indices_patches(token_to_patch, examples, inp, input_prompts, toke
 
 
 def patch_ex1_into_ex2(
-    mt, ex1, ex2, num_layers, kind, window, token_to_patch="last", generate_n_tokens=1
+    mt,
+    ex1,
+    ex2,
+    num_layers,
+    kind,
+    window,
+    token_to_patch="last",
+    generate_n_tokens=1,
+    decoder_input_ids=None,
 ):
     "Patch the repr from ex1 into the forward pass of ex2."
     device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
@@ -74,25 +82,32 @@ def patch_ex1_into_ex2(
     mt.tokenizer.padding_side = "left"
     inp = mt.tokenizer(input_prompts, return_tensors="pt", padding=True).to(device)
     if ex1["decoder_input_ids"] is not None:
-        max_length = max(
-            [len(i) for i in [ex1["decoder_input_ids"], ex2["decoder_input_ids"]]]
-        )
-        decoder_input_ids = (
-            torch.zeros(2, max_length, dtype=inp["input_ids"].dtype)
-            + mt.tokenizer.pad_token_id
-        )
-        decoder_input_ids[0, -len(ex1["decoder_input_ids"]) :] = torch.tensor(
-            ex1["decoder_input_ids"]
-        )
-        decoder_input_ids[1, -len(ex2["decoder_input_ids"]) :] = torch.tensor(
-            ex2["decoder_input_ids"]
-        )
+        if decoder_input_ids is not None:
+            max_length = None
+            decoder_input_ids = torch.tensor(
+                [decoder_input_ids, decoder_input_ids], dtype=inp["input_ids"].dtype
+            )
+        else:
+            max_length = max(
+                [len(i) for i in [ex1["decoder_input_ids"], ex2["decoder_input_ids"]]]
+            )
+            decoder_input_ids = (
+                torch.zeros(2, max_length, dtype=inp["input_ids"].dtype)
+                + mt.tokenizer.pad_token_id
+            )
+            decoder_input_ids[0, -len(ex1["decoder_input_ids"]) :] = torch.tensor(
+                ex1["decoder_input_ids"]
+            )
+            decoder_input_ids[1, -len(ex2["decoder_input_ids"]) :] = torch.tensor(
+                ex2["decoder_input_ids"]
+            )
         inp["decoder_input_ids"] = decoder_input_ids.to(device)
-        inp["decoder_attention_mask"] = torch.ones_like(inp["decoder_input_ids"])
-        if len(ex1["decoder_input_ids"]) < max_length:
-            inp["decoder_attention_mask"][0, 0 : -len(ex1["decoder_input_ids"])] = 0
-        if len(ex2["decoder_input_ids"]) < max_length:
-            inp["decoder_attention_mask"][1, 0 : -len(ex2["decoder_input_ids"])] = 0
+        if max_length:
+            inp["decoder_attention_mask"] = torch.ones_like(inp["decoder_input_ids"])
+            if len(ex1["decoder_input_ids"]) < max_length:
+                inp["decoder_attention_mask"][0, 0 : -len(ex1["decoder_input_ids"])] = 0
+            if len(ex2["decoder_input_ids"]) < max_length:
+                inp["decoder_attention_mask"][1, 0 : -len(ex2["decoder_input_ids"])] = 0
     patches = get_token_indices_patches(
         token_to_patch, [ex1, ex2], inp, input_prompts, mt.tokenizer
     )
@@ -300,6 +315,9 @@ def main(args):
     if args.generate_n_tokens != 1:
         wandb.run.name += f" generate={args.generate_n_tokens}"
         data_id += f"_generate={args.generate_n_tokens}"
+    if args.overwrite_mt5_decoder_input_ids:
+        wandb.run.name += " overwrite_decoder_input"
+        data_id += "_overwrite_decoder_input"
     output_folder = os.path.join(args.output_folder, args.model_name, data_id)
     wandb.config["final_output_folder"] = output_folder
     os.makedirs(output_folder, exist_ok=True)
@@ -321,6 +339,11 @@ def main(args):
     # Note that we are only keeping one template.
     id_to_ex1 = {ex["id"][: ex["id"].rfind("_")]: ex for ex in ds}
     counts = collections.defaultdict(int)
+
+    decoder_input_ids = None
+    if args.overwrite_mt5_decoder_input_ids:
+        decoder_input_ids = [0, 250099]
+
     for lang in tqdm(args.languages_to_patch, desc="Languages"):
         if lang == args.language and not args.allow_same_lang_patch:
             continue
@@ -376,6 +399,7 @@ def main(args):
                     window=args.patch_k_layers,
                     token_to_patch=token_to_patch,
                     generate_n_tokens=args.generate_n_tokens,
+                    decoder_input_ids=decoder_input_ids,
                 )
                 numpy_result = {
                     k: v.detach().cpu().numpy() if torch.is_tensor(v) else v
@@ -408,6 +432,7 @@ if __name__ == "__main__":
     parser.add_argument("--resample_trivial", action="store_true")
     parser.add_argument("--override_results", action="store_true")
     parser.add_argument("--allow_same_lang_patch", action="store_true")
+    parser.add_argument("--overwrite_mt5_decoder_input_ids", action="store_true")
     parser.add_argument("--patch_k_layers", type=int, default=10)
     parser.add_argument("--max_examples", type=int, default=1000)
     parser.add_argument("--generate_n_tokens", type=int, default=1)
