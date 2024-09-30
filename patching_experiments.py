@@ -120,7 +120,7 @@ def patch_ex1_into_ex2(
     base_entropies = -torch.sum(probs * torch.log(probs + 1e-10), dim=-1)
 
     answers = decode_tokens(mt.tokenizer, preds_tokens)
-    if not decoder_input_ids:
+    if decoder_input_ids is None:
         assert ex1["prediction"].startswith(answers[0]), ex1["id"]
         assert ex2["prediction"].startswith(answers[1]), ex2["id"]
     patches_results = []
