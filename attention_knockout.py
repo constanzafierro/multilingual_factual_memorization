@@ -116,7 +116,8 @@ def set_block_attn_hooks(model, attn_layer_to_blockage):
             real_seq_length = seq_length  # This only works for generate_tokens=1
             key_length = (
                 real_seq_length
-                if kwargs["key_value_states"] is None
+                if "key_value_states" not in kwargs
+                or kwargs["key_value_states"] is None
                 else kwargs["key_value_states"].shape[1]
             )
             # This assumes there is no masking. Copy paste from mt5.modeling_mt5.MT5Attention
