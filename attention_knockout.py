@@ -109,10 +109,31 @@ def set_block_attn_hooks(model, attn_layer_to_blockage):
         return wrapper_fn
 
     def reset_position_bias(module, args, kwargs, output):
-        if kwargs["position_bias"] is None:
-            return
+        position_bias = kwargs["position_bias"]
+        if position_bias is None:
+            hidden_states = args[0]
+            batch_size, seq_length = hidden_states.shape[:2]
+            real_seq_length = seq_length  # This only works for generate_tokens=1
+            key_length = (
+                real_seq_length
+                if kwargs["key_value_states"] is None
+                else kwargs["key_value_states"].shape[1]
+            )
+            # This assumes there is no masking. Copy paste from mt5.modeling_mt5.MT5Attention
+            if not module.has_relative_attention_bias:
+                position_bias = torch.zeros(
+                    (1, module.n_heads, real_seq_length, key_length),
+                    device=hidden_states.device,
+                    dtype=hidden_states.dtype,
+                )
+                if module.gradient_checkpointing and module.training:
+                    position_bias.requires_grad = True
+            else:
+                position_bias = module.compute_bias(
+                    real_seq_length, key_length, device=hidden_states.device
+                )
         output = list(output)
-        output[2] = kwargs["position_bias"]
+        output[2] = position_bias
         return tuple(output)
 
     hooks = []
