@@ -30,25 +30,12 @@ def get_token_indices_patches(token_to_patch, examples, inp, input_prompts, toke
                     [("input_ids", "encoder")],
                 )
             ]
-        sentinel_token_0 = (inp["input_ids"][0] == 250099).nonzero()
-        sentinel_token_1 = (inp["input_ids"][1] == 250099).nonzero()
-        if len(sentinel_token_0) == 0 or len(sentinel_token_1) == 0:
-            return [
-                (
-                    token_idx_to_patch_from,
-                    token_idx_to_patch,
-                    [("decoder_input_ids", "decoder")],
-                )
-            ]
-        sentinel_token_0 = sentinel_token_0.item()
-        sentinel_token_1 = sentinel_token_1.item()
         return [
-            (sentinel_token_0, sentinel_token_1, [("input_ids", "encoder")]),
             (
                 token_idx_to_patch_from,
                 token_idx_to_patch,
                 [("decoder_input_ids", "decoder")],
-            ),
+            )
         ]
     elif token_to_patch == "last_subject_token":
         subj_ranges = []
@@ -61,6 +48,71 @@ def get_token_indices_patches(token_to_patch, examples, inp, input_prompts, toke
         return [
             (token_idx_to_patch_from, token_idx_to_patch, [("input_ids", "encoder")])
         ]
+
+
+def add_decoder_extra_tokens_to_inp(
+    ex1_input_ids,
+    ex2_input_ids,
+    ex1_decoder_input_ids,
+    ex2_decoder_input_ids,
+    decoder_input_ids,
+    pad_token,
+    device,
+):
+    def get_updated_input_ids(input_ids, decoder_input_ids, new_decoder_input_ids):
+        extra = torch.tensor(
+            decoder_input_ids[len(new_decoder_input_ids) :], dtype=input_ids.dtype
+        )
+        sentinel_token = 250099
+        sentinel_index = (input_ids == sentinel_token).nonzero()
+        before_sentinel = input_ids[:sentinel_index]
+        sentinel_and_after = input_ids[sentinel_index:]
+        return torch.concat([before_sentinel, extra, sentinel_and_after])
+
+    print("ex1_input_ids", len(ex1_input_ids), ex1_input_ids)
+    print("ex1_decoder_input_ids", len(ex1_decoder_input_ids), ex1_decoder_input_ids)
+    print("ex2_input_ids", len(ex2_input_ids), ex2_input_ids)
+    print("ex2_decoder_input_ids", len(ex2_decoder_input_ids), ex2_decoder_input_ids)
+    decoder_input_ids = np.array(decoder_input_ids)
+    assert np.all(ex1_decoder_input_ids[: len(decoder_input_ids)] == decoder_input_ids)
+    assert np.all(ex1_decoder_input_ids[: len(decoder_input_ids)] == decoder_input_ids)
+    ex1_input_ids = get_updated_input_ids(
+        ex1_input_ids, ex1_decoder_input_ids, decoder_input_ids
+    )
+    ex2_input_ids = get_updated_input_ids(
+        ex2_input_ids, ex2_decoder_input_ids, decoder_input_ids
+    )
+    attention_mask = torch.ones(2, max(len(ex1_input_ids), len(ex2_input_ids)))
+    print("ex1_input_ids", len(ex1_input_ids), ex1_input_ids)
+    print("ex2_input_ids", len(ex2_input_ids), ex2_input_ids)
+    if len(ex1_input_ids) > len(ex2_input_ids):
+        pad_length = len(ex1_input_ids) - len(ex2_input_ids)
+        ex2_input_ids = torch.cat(
+            [
+                torch.zeros(pad_length, dtype=ex2_input_ids.dtype) + pad_token,
+                ex2_input_ids,
+            ]
+        )
+        attention_mask[1][:pad_length] = 0
+    elif len(ex2_input_ids) > len(ex1_input_ids):
+        pad_length = len(ex2_input_ids) - len(ex1_input_ids)
+        ex1_input_ids = torch.cat(
+            [
+                torch.zeros(pad_length, dtype=ex1_input_ids.dtype) + pad_token,
+                ex1_input_ids,
+            ]
+        )
+        attention_mask[0][:pad_length] = 0
+    print("ex1_input_ids", len(ex1_input_ids), ex1_input_ids)
+    print("ex2_input_ids", len(ex2_input_ids), ex2_input_ids)
+    input_ids = torch.stack([ex1_input_ids, ex2_input_ids]).to(device)
+    return dict(
+        input_ids=input_ids,
+        attention_mask=attention_mask.to(device),
+        decoder_input_ids=torch.tensor(
+            np.stack([decoder_input_ids, decoder_input_ids])
+        ),
+    )
 
 
 def patch_ex1_into_ex2(
@@ -80,14 +132,21 @@ def patch_ex1_into_ex2(
     for ex in [ex1, ex2]:
         input_prompts.append(ex["query_inference"])
     mt.tokenizer.padding_side = "left"
-    inp = mt.tokenizer(input_prompts, return_tensors="pt", padding=True).to(device)
-    if ex1["decoder_input_ids"] is not None:
-        if decoder_input_ids is not None:
-            max_length = None
-            decoder_input_ids = torch.tensor(
-                [decoder_input_ids, decoder_input_ids], dtype=inp["input_ids"].dtype
-            )
-        else:
+    if decoder_input_ids is not None:
+        ex1_inp = mt.tokenizer(input_prompts[0], return_tensors="pt")["input_ids"][0]
+        ex2_inp = mt.tokenizer(input_prompts[1], return_tensors="pt")["input_ids"][0]
+        inp = add_decoder_extra_tokens_to_inp(
+            ex1_inp,
+            ex2_inp,
+            ex1["decoder_input_ids"],
+            ex2["decoder_input_ids"],
+            decoder_input_ids,
+            mt.tokenizer.pad_token_id,
+            device,
+        )
+    else:
+        inp = mt.tokenizer(input_prompts, return_tensors="pt", padding=True).to(device)
+        if ex1["decoder_input_ids"] is not None:
             max_length = max(
                 [len(i) for i in [ex1["decoder_input_ids"], ex2["decoder_input_ids"]]]
             )
