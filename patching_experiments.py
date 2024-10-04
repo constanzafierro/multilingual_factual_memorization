@@ -2,12 +2,13 @@ import argparse
 import collections
 import json
 import os
-from itertools import product, permutations
+from itertools import permutations, product
 
 import numpy as np
 import pandas as pd
 import torch
 import wandb
+from datasets import load_dataset
 from tqdm import tqdm
 
 from dataset.data_utils import find_token_range, get_dataset_name, get_memorized_dataset
@@ -287,7 +288,7 @@ def get_diff_subj_same_relation_ids(ds, ds_other):
     return examples_ids
 
 
-def get_diff_subj_diff_relation_ids(ds, ds_other):
+def get_diff_subj_diff_relation_ids(ds, ds_other, max_examples):
     source_r_to_subjects = collections.defaultdict(set)
     target_r_to_subjects = collections.defaultdict(set)
     for ex in ds:
@@ -311,7 +312,27 @@ def get_diff_subj_diff_relation_ids(ds, ds_other):
                         f"{langs[1]}_{r_target}_{s_target}",
                     )
                 )
-    return examples_ids
+    assert set(langs) == {"en"}
+    id_to_ex = {ex["id"][: ex["id"].rfind("_")]: ex for ex in ds}
+    full_ds = load_dataset("coastalcph/mpararel")["train"]
+    full_ds = full_ds.filter(lambda ex: ex["language"] == "en")
+
+    relation_subj_to_obj_uri = {}
+    for ex in full_ds:
+        relation_subj_to_obj_uri[f"{ex['relation']}_{ex['sub_uri']}"] = ex["obj_uri"]
+    r1_s2 = []
+    both = []
+    for ex_id_source, ex_id_target in tqdm(examples_ids):
+        ex1 = id_to_ex[ex_id_source]
+        ex2 = id_to_ex[ex_id_target]
+        if relation_subj_to_obj_uri[f"{ex1['relation']}_{ex2['sub_uri']}"]:
+            if relation_subj_to_obj_uri[f"{ex2['relation']}_{ex1['sub_uri']}"]:
+                both.append((ex_id_source, ex_id_target))
+            else:
+                r1_s2.append((ex_id_source, ex_id_target))
+    if len(both) >= max_examples:
+        return both
+    return both + r1_s2
 
 
 def get_same_subj_diff_relation_ids(ds, ds_other):
@@ -433,7 +454,9 @@ def main(args):
             ids_to_patch = get_xlingual_mem_ids(ds, ds_other)
             token_to_patch = "last"
         elif args.token_to_patch == "last_all_diff":
-            ids_to_patch = get_diff_subj_diff_relation_ids(ds, ds_other)
+            ids_to_patch = get_diff_subj_diff_relation_ids(
+                ds, ds_other, args.max_examples
+            )
             token_to_patch = "last"
         counts[f"total_examples/{lang}"] = len(ids_to_patch)
 
