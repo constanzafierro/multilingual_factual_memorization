@@ -325,8 +325,8 @@ def get_diff_subj_diff_relation_ids(ds, ds_other, max_examples):
     for ex_id_source, ex_id_target in tqdm(examples_ids):
         ex1 = id_to_ex[ex_id_source]
         ex2 = id_to_ex[ex_id_target]
-        if relation_subj_to_obj_uri[f"{ex1['relation']}_{ex2['sub_uri']}"]:
-            if relation_subj_to_obj_uri[f"{ex2['relation']}_{ex1['sub_uri']}"]:
+        if f"{ex1['relation']}_{ex2['sub_uri']}" in relation_subj_to_obj_uri:
+            if f"{ex2['relation']}_{ex1['sub_uri']}" in relation_subj_to_obj_uri:
                 both.append((ex_id_source, ex_id_target))
             else:
                 r1_s2.append((ex_id_source, ex_id_target))
