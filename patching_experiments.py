@@ -161,8 +161,7 @@ def patch_ex1_into_ex2(
             decoder_input_ids[1, -len(ex2["decoder_input_ids"]) :] = torch.tensor(
                 ex2["decoder_input_ids"]
             )
-        inp["decoder_input_ids"] = decoder_input_ids.to(device)
-        if max_length:
+            inp["decoder_input_ids"] = decoder_input_ids.to(device)
             inp["decoder_attention_mask"] = torch.ones_like(inp["decoder_input_ids"])
             if len(ex1["decoder_input_ids"]) < max_length:
                 inp["decoder_attention_mask"][0, 0 : -len(ex1["decoder_input_ids"])] = 0
