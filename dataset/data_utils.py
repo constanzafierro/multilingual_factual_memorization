@@ -325,19 +325,7 @@ def is_trivial(ex):
     return is_trivial_example(ex["obj_label"], ex["query"])
 
 
-def get_memorized_dataset(
-    dataset_name,
-    language,
-    eval_dir,
-    folder_model_name,
-    only_subset,
-    tokenizer=None,
-    filter_trivial=False,
-    resample_trivial=False,
-    keep_only_trivial=False,
-    filter_decode_tokenize_diff=True,
-    log_to_wandb=True,
-):
+def get_eval_df_filename(eval_dir, language, dataset_name, folder_model_name):
     eval_folder_glob = os.path.join(
         eval_dir, f"{language}*{dataset_name.split('/')[1]}--{folder_model_name}"
     )
@@ -363,7 +351,25 @@ def get_memorized_dataset(
                 )
             )
     assert len(eval_df_filename) == 1, eval_df_filename
-    eval_df_filename = eval_df_filename[0]
+    return eval_df_filename[0]
+
+
+def get_memorized_dataset(
+    dataset_name,
+    language,
+    eval_dir,
+    folder_model_name,
+    only_subset,
+    tokenizer=None,
+    filter_trivial=False,
+    resample_trivial=False,
+    keep_only_trivial=False,
+    filter_decode_tokenize_diff=True,
+    log_to_wandb=True,
+):
+    eval_df_filename = get_eval_df_filename(
+        eval_dir, language, dataset_name, folder_model_name
+    )
     if wandb.run is not None and log_to_wandb:
         wandb.config["eval_df_filename"] = eval_df_filename
     ds = _get_memorized_ds(dataset_name, eval_df_filename, tokenizer)
