@@ -145,23 +145,30 @@ def compute_metrics(df):
     return metrics
 
 
-def main(args):
-    dataset_name = get_dataset_name(args.model_name, args.language)
+def get_predictions_path(predictions_folder, model_name, language, dataset_name):
     pattern = os.path.join(
-        args.predictions_folder,
+        predictions_folder,
         "".join(
             [
-                args.language,
+                language,
                 "{}",
                 dataset_name.split("/")[1],
                 "--",
-                args.model_name.replace("/", "__"),
+                model_name.replace("/", "__"),
             ]
         ),
     )
     predictions_path = pattern.format("--")
     if not os.path.isfile(os.path.join(predictions_path, "predictions.json")):
         predictions_path = pattern.format("_")
+    return predictions_path
+
+
+def main(args):
+    dataset_name = get_dataset_name(args.model_name, args.language)
+    predictions_path = get_predictions_path(
+        args.predictions_folder, args.model_name, args.language, dataset_name
+    )
     experiment_dir = os.path.join(args.output_dir, os.path.basename(predictions_path))
     if args.use_sentinel_prediction:
         experiment_dir = os.path.join(experiment_dir, "sentinel_pred")
