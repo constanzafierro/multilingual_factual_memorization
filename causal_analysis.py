@@ -38,6 +38,7 @@ def calculate_hidden_flow(
     kind=None,
     samples=10,
     expected_ans=None,
+    use_logits=False,
 ):
     """
     Copy of the function in causal_trace.ipynb
@@ -68,11 +69,17 @@ def calculate_hidden_flow(
     e_range = find_token_range(mt.tokenizer, inp["input_ids"][0], subject, prompt)
     # Add noise and make a forward pass.
     low_score = trace_with_patch(
-        mt.model, inp, [], answer_t, e_range, noise=noise
+        mt.model, inp, [], answer_t, e_range, noise=noise, use_logits=use_logits
     ).item()
     if not kind:
         differences = trace_important_states(
-            mt.model, mt.num_layers, inp, e_range, answer_t, noise=noise
+            mt.model,
+            mt.num_layers,
+            inp,
+            e_range,
+            answer_t,
+            noise=noise,
+            use_logits=use_logits,
         )
     else:
         differences = trace_important_window(
@@ -85,6 +92,7 @@ def calculate_hidden_flow(
             window=window,
             kind=kind,
             low_score=low_score,
+            use_logits=use_logits,
         )
     differences = differences.detach().cpu()
     input_ids = inp["input_ids"][0]
@@ -405,6 +413,7 @@ def plot_hidden_flow(
     kind,
     noise_level,
     patch_k_layers,
+    use_logits,
     override=False,
 ):
     unk_in_query_inference = set()
@@ -426,6 +435,7 @@ def plot_hidden_flow(
                 kind=kind,
                 window=patch_k_layers,
                 expected_ans=ex["prediction"],
+                use_logits=use_logits,
             )
             if not result:
                 unk_in_query_inference.add(f"{ex_id}{kind}.npz")
@@ -457,7 +467,9 @@ def main(args):
     if args.patch_k_layers != 10:
         data_id += f"_window={args.patch_k_layers}"
     if args.override_noise_level is not None:
-        data_id += +f"_noise={args.override_noise_level}"
+        data_id += f"_noise={args.override_noise_level}"
+    if args.use_logits:
+        data_id += "_logits"
     cache_dir = os.path.join(args.output_folder, args.model_name, data_id)
 
     cache_hidden_flow = os.path.join(cache_dir, "cache_hidden_flow")
@@ -541,6 +553,7 @@ def main(args):
                     kind,
                     noise_level,
                     args.patch_k_layers,
+                    use_logits=args.use_logits,
                     override=args.override,
                 )
             )
@@ -596,6 +609,7 @@ if __name__ == "__main__":
     parser.add_argument("--keep_only_trivial", action="store_true")
     parser.add_argument("--resample_trivial", action="store_true")
     parser.add_argument("--use_vmin_vmax_from_folder", type=str, default=None)
+    parser.add_argument("--use_logits", action="store_true")
     args = parser.parse_args()
     if not args.model_name:
         args.model_name = args.model_name_or_path.replace("/", "__")
@@ -605,6 +619,7 @@ if __name__ == "__main__":
             [
                 args.model_name,
                 args.language,
+                ("(logits)" if args.use_logits else ""),
                 (
                     f"noise={args.override_noise_level}"
                     if args.override_noise_level is not None

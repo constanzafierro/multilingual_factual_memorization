@@ -17,6 +17,7 @@ def trace_with_patch(
     noise=0.1,  # Level of noise to add
     trace_layers=None,  # List of traced outputs to return
     generate_n_tokens=1,
+    use_logits=False,
 ):
     """The first example in the batch is used for patching in all the subsequent examples.
     The probability is tracked over the mean of all the subsequent examples.
@@ -83,9 +84,12 @@ def trace_with_patch(
     if noise:
         # Logits is a tuple with length max_new_tokens and each element is a
         # tensor of shape (batch_size, config.vocab_size).
-        probs = torch.softmax(outputs_exp.logits[-1][1:, :], dim=1).mean(dim=0)[
-            answers_t
-        ]
+        if use_logits:
+            probs = outputs_exp.logits[-1][1:, :].mean(dim=0)[answers_t]
+        else:
+            probs = torch.softmax(outputs_exp.logits[-1][1:, :], dim=1).mean(dim=0)[
+                answers_t
+            ]
     else:
         probs_first_token = torch.softmax(outputs_exp.logits[0][1:, :], dim=1)
         sort_ind = np.argsort(-probs_first_token.detach().cpu().numpy(), axis=-1)
@@ -132,6 +136,7 @@ def trace_important_states(
     ntoks=None,
     ids_stack=None,
     generate_n_tokens=1,
+    use_logits=False,
 ):
     """Copy of the function in causal_trace.ipynb"""
     table = []
@@ -154,6 +159,7 @@ def trace_important_states(
                     tokens_to_mix=e_range,
                     noise=noise,
                     generate_n_tokens=generate_n_tokens,
+                    use_logits=use_logits,
                 )
                 row.append(r)
             if noise:
@@ -205,6 +211,7 @@ def trace_important_window(
     noise=0.1,
     ntoks=None,
     low_score=None,
+    use_logits=False,
 ):
     """Copy of the function in causal_trace.ipynb"""
     tokens_to_patch = ntoks
@@ -228,7 +235,13 @@ def trace_important_window(
                     )
                 ]
                 r = trace_with_patch(
-                    model, inp, layerlist, answer_t, tokens_to_mix=e_range, noise=noise
+                    model,
+                    inp,
+                    layerlist,
+                    answer_t,
+                    tokens_to_mix=e_range,
+                    noise=noise,
+                    use_logits=use_logits,
                 )
                 row.append(r.detach().cpu())
             table.append(torch.stack(row))
