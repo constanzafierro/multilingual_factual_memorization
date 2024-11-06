@@ -30,10 +30,7 @@ def load_model_and_tok(model_name_or_path, model_name):
     accelerator = Accelerator()
     model = accelerator.prepare(model)
     config = AutoConfig.from_pretrained(model_name_or_path)
-    tokenizer = AutoTokenizer.from_pretrained(
-        model_name_or_path,
-        use_fast=not isinstance(model, LlamaForCausalLM),
-    )
+    tokenizer = AutoTokenizer.from_pretrained(model_name_or_path)
     return ModelAndTokenizer(
         model_name=model_name,
         model=model,
