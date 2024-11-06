@@ -157,9 +157,10 @@ def inference(dataset, tokenizer, model, args, experiment_dir):
             prompt = prepare_prompt(
                 query, args.model_name_or_path, args.instruction, args.is_mlm_template
             )
-            input_ids = tokenizer.encode(prompt, return_tensors="pt").to(device)
+            inputs = tokenizer(prompt, return_tensors="pt").to(device)
+            input_ids = inputs["input_ids"]
             model_output = model.generate(
-                input_ids, generation_config=config, output_scores=True
+                **inputs, generation_config=config, output_scores=True
             )
 
         answer, token_scores, first_token_score, perplexity = get_scores(
