@@ -30,12 +30,15 @@ def load_model_and_tok(model_name_or_path, model_name):
     accelerator = Accelerator()
     model = accelerator.prepare(model)
     config = AutoConfig.from_pretrained(model_name_or_path)
+    num_layers = (
+        config.num_layers if hasattr(config, "num_layers") else config.num_hidden_layers
+    )
     tokenizer = AutoTokenizer.from_pretrained(model_name_or_path)
     return ModelAndTokenizer(
         model_name=model_name,
         model=model,
         tokenizer=tokenizer,
-        num_layers=config.num_layers,
+        num_layers=num_layers,
     )
 
 
