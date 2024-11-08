@@ -16,6 +16,7 @@ from transformers import (
     PreTrainedTokenizerFast,
     T5TokenizerFast,
     XGLMTokenizerFast,
+    GemmaTokenizerFast,
 )
 
 from model_utils import load_model_and_tok
@@ -44,6 +45,7 @@ def remove_bos(tokenizer, seq, input_ids):
         XGLMTokenizerFast: ignore_prompt,
         BloomTokenizerFast: ignore_prompt,
         GPT2TokenizerFast: ignore_prompt,
+        GemmaTokenizerFast: ignore_prompt,
         PreTrainedTokenizerFast: lambda seq, input_ids: seq[input_ids.shape[1] :]
         .cpu()
         .tolist(),
@@ -72,6 +74,7 @@ def get_ids_to_ignore(tokenizer):
         XGLMTokenizerFast: [tokenizer.eos_token_id],
         BloomTokenizerFast: [],
         GPT2TokenizerFast: [],
+        GemmaTokenizerFast: [],
     }
     return ids_to_ignore[type(tokenizer)]
 

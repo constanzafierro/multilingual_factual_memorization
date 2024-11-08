@@ -15,6 +15,7 @@ from transformers import (
     LlamaTokenizerFast,
     T5TokenizerFast,
     XGLMTokenizerFast,
+    GemmaTokenizerFast,
 )
 
 TOKENIZER_TO_PREPEND_SPACE = {
@@ -24,6 +25,7 @@ TOKENIZER_TO_PREPEND_SPACE = {
     LlamaTokenizer: False,
     GPTNeoXTokenizerFast: True,
     XGLMTokenizerFast: False,
+    GemmaTokenizerFast: True,
 }
 
 
@@ -161,28 +163,33 @@ def add_exact_query_and_prediction(example, memorized_df, df_id_to_index, tokeni
     return example
 
 
-def log_trivial_examples_counts(memorized_df, ds):
+def log_trivial_examples_counts(inference_df, ds):
     ds_id_to_index = {ex["id"]: i for i, ex in enumerate(ds)}
-    memorized_df["query"] = memorized_df.apply(
+    inference_df["query"] = inference_df.apply(
         lambda row: ds[ds_id_to_index[row["id"]]]["query"], axis=1
     )
-    memorized_df["is_trivial"] = memorized_df.apply(
+    inference_df["is_trivial"] = inference_df.apply(
         lambda row: is_trivial_example(row["ground_truth"], row["query"]), axis=1
     )
-    memorized_df["relation"] = memorized_df.apply(
+    inference_df["relation"] = inference_df.apply(
         lambda ex: ex["id"].split("_")[1], axis=1
     )
-    memorized_df["template_id"] = memorized_df.apply(
+    inference_df["template_id"] = inference_df.apply(
         lambda ex: ex["id"].split("_")[-1], axis=1
     )
-    memorized_df["subj_id"] = memorized_df.apply(
+    inference_df["subj_id"] = inference_df.apply(
         lambda ex: ex["id"].split("_")[-2], axis=1
     )
     memorized_examples = (
-        memorized_df[memorized_df.exact_match][
+        inference_df[inference_df.exact_match][
             ["relation", "subj_id", "template_id", "is_trivial"]
         ]
         .groupby(by=["relation", "subj_id", "is_trivial"], as_index=False)
+        .count()
+    )
+    total_facts = len(
+        inference_df[~inference_df.is_trivial][["relation", "subj_id", "template_id"]]
+        .groupby(by=["relation", "subj_id"], as_index=False)
         .count()
     )
     wandb.log(
@@ -192,8 +199,13 @@ def log_trivial_examples_counts(memorized_df, ds):
             "trivial_memorization_examples": len(
                 memorized_examples[memorized_examples.is_trivial]
             ),
-            "trivial_memorization": len(memorized_df[memorized_df.is_trivial])
-            / len(memorized_df),
+            "trivial_memorization": len(
+                memorized_examples[memorized_examples.is_trivial]
+            )
+            / len(memorized_examples),
+            "total_examples": total_facts,
+            "memorized_non_trivial": len(memorized_examples)
+            - len(memorized_examples[memorized_examples.is_trivial]),
         }
     )
 
