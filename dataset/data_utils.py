@@ -16,6 +16,7 @@ from transformers import (
     T5TokenizerFast,
     XGLMTokenizerFast,
     GemmaTokenizerFast,
+    Qwen2TokenizerFast,
 )
 
 TOKENIZER_TO_PREPEND_SPACE = {
@@ -26,6 +27,7 @@ TOKENIZER_TO_PREPEND_SPACE = {
     GPTNeoXTokenizerFast: True,
     XGLMTokenizerFast: False,
     GemmaTokenizerFast: True,
+    Qwen2TokenizerFast: True,
 }
 
 
