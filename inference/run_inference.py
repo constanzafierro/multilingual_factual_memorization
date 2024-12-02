@@ -77,6 +77,7 @@ def get_ids_to_ignore(tokenizer):
         BloomTokenizerFast: [],
         GPT2TokenizerFast: [],
         GemmaTokenizerFast: [],
+        Qwen2TokenizerFast: [],
     }
     return ids_to_ignore[type(tokenizer)]
 
