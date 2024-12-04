@@ -133,6 +133,8 @@ def patch_ex1_into_ex2(
     for ex in [ex1, ex2]:
         input_prompts.append(ex["query_inference"])
     mt.tokenizer.padding_side = "left"
+    if mt.tokenizer.pad_token is None:
+        mt.tokenizer.pad_token = mt.tokenizer.eos_token
     if decoder_input_ids is not None:
         ex1_inp = mt.tokenizer(input_prompts[0], return_tensors="pt")["input_ids"][0]
         ex2_inp = mt.tokenizer(input_prompts[1], return_tensors="pt")["input_ids"][0]
