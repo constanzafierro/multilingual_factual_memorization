@@ -14,6 +14,7 @@ from transformers import (
     AutoTokenizer,
     XGLMForCausalLM,
     MT5ForConditionalGeneration,
+    LlamaForCausalLM,
 )
 
 from dsets import KnownsDataset
@@ -527,7 +528,7 @@ def layername(model, num=-1, kind=None, stack="encoder"):
             "embed": "shared",
             "lm_head": "lm_head",
             "layers": f"{stack}.block",
-            "lm_norm": "decoder.final_layer_norm"
+            "lm_norm": "decoder.final_layer_norm",
         }
         if kind in kind_to_layer:
             return kind_to_layer[kind]
@@ -539,6 +540,16 @@ def layername(model, num=-1, kind=None, stack="encoder"):
         return (
             f'{stack}.block.{num}{"" if kind is None else ".layer." + kind_map[kind]}'
         )
+    if isinstance(model, LlamaForCausalLM):
+        kind_to_layer = {
+            "embed": "model.embed_tokens",
+            "layers": "model.layers",
+            "lm_head": "lm_head",
+        }
+        if kind in kind_to_layer:
+            return kind_to_layer[kind]
+        kind_map = {"attn": "self_attn", "mlp": "mlp"}
+        return f'model.layers.{num}{"" if kind is None else "." + kind_map[kind]}'
     assert False, "unknown transformer structure"
 
 
