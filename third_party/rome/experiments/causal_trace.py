@@ -476,7 +476,7 @@ class ModelAndTokenizer:
             model.eval().cuda()
         self.model_name = model_name
         self.tokenizer = tokenizer
-        self.model = model
+        self.model = model.eval()
         self.num_layers = num_layers
         if not num_layers:
             self.layer_names = [

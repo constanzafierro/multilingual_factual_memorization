@@ -39,6 +39,9 @@ def get_token_indices_patches(token_to_patch, examples, inp, input_prompts, toke
             )
         ]
     elif token_to_patch == "last_subject_token":
+        raise Exception(
+            "Make sure this is still working now that we use input_ids directly."
+        )
         subj_ranges = []
         for ex, input_ids, prompt in zip(examples, inp["input_ids"], input_prompts):
             subj_ranges.append(
@@ -116,6 +119,28 @@ def add_decoder_extra_tokens_to_inp(
     )
 
 
+def add_examples_decoder_input_ids(inp, ex1, ex2, pad_token_id):
+    device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
+    max_length = max(
+        [len(i) for i in [ex1["decoder_input_ids"], ex2["decoder_input_ids"]]]
+    )
+    decoder_input_ids = (
+        torch.zeros(2, max_length, dtype=inp["input_ids"].dtype) + pad_token_id
+    )
+    decoder_input_ids[0, -len(ex1["decoder_input_ids"]) :] = torch.tensor(
+        ex1["decoder_input_ids"]
+    )
+    decoder_input_ids[1, -len(ex2["decoder_input_ids"]) :] = torch.tensor(
+        ex2["decoder_input_ids"]
+    )
+    inp["decoder_input_ids"] = decoder_input_ids.to(device)
+    inp["decoder_attention_mask"] = torch.ones_like(inp["decoder_input_ids"])
+    if len(ex1["decoder_input_ids"]) < max_length:
+        inp["decoder_attention_mask"][0, 0 : -len(ex1["decoder_input_ids"])] = 0
+    if len(ex2["decoder_input_ids"]) < max_length:
+        inp["decoder_attention_mask"][1, 0 : -len(ex2["decoder_input_ids"])] = 0
+
+
 def patch_ex1_into_ex2(
     mt,
     ex1,
@@ -135,6 +160,7 @@ def patch_ex1_into_ex2(
     mt.tokenizer.padding_side = "left"
     if mt.tokenizer.pad_token is None:
         mt.tokenizer.pad_token = mt.tokenizer.eos_token
+        mt.tokenizer.pad_token_id = mt.tokenizer.eos_token_id
     if decoder_input_ids is not None:
         ex1_inp = mt.tokenizer(input_prompts[0], return_tensors="pt")["input_ids"][0]
         ex2_inp = mt.tokenizer(input_prompts[1], return_tensors="pt")["input_ids"][0]
@@ -148,27 +174,23 @@ def patch_ex1_into_ex2(
             device,
         )
     else:
-        inp = mt.tokenizer(input_prompts, return_tensors="pt", padding=True).to(device)
+        inp = mt.tokenizer(input_prompts, return_tensors="pt", padding=True)
+        inp["input_ids"] = (
+            torch.ones(
+                2,
+                max(len(ex1["input_ids"]), len(ex2["input_ids"])),
+                dtype=inp["input_ids"].dtype,
+            )
+            * mt.tokenizer.pad_token_id
+        )
+        inp["input_ids"][0, : len(ex1["input_ids"])] = torch.tensor(ex1["input_ids"])
+        inp["input_ids"][1, : len(ex2["input_ids"])] = torch.tensor(ex2["input_ids"])
+        inp["attention_mask"] = torch.zeros_like(inp["input_ids"])
+        inp["attention_mask"][0][-len(ex1["input_ids"]) :] = 1
+        inp["attention_mask"][1][-len(ex2["input_ids"]) :] = 1
+        inp.to(device)
         if ex1["decoder_input_ids"] is not None:
-            max_length = max(
-                [len(i) for i in [ex1["decoder_input_ids"], ex2["decoder_input_ids"]]]
-            )
-            decoder_input_ids = (
-                torch.zeros(2, max_length, dtype=inp["input_ids"].dtype)
-                + mt.tokenizer.pad_token_id
-            )
-            decoder_input_ids[0, -len(ex1["decoder_input_ids"]) :] = torch.tensor(
-                ex1["decoder_input_ids"]
-            )
-            decoder_input_ids[1, -len(ex2["decoder_input_ids"]) :] = torch.tensor(
-                ex2["decoder_input_ids"]
-            )
-            inp["decoder_input_ids"] = decoder_input_ids.to(device)
-            inp["decoder_attention_mask"] = torch.ones_like(inp["decoder_input_ids"])
-            if len(ex1["decoder_input_ids"]) < max_length:
-                inp["decoder_attention_mask"][0, 0 : -len(ex1["decoder_input_ids"])] = 0
-            if len(ex2["decoder_input_ids"]) < max_length:
-                inp["decoder_attention_mask"][1, 0 : -len(ex2["decoder_input_ids"])] = 0
+            add_examples_decoder_input_ids(inp, ex1, ex2, mt.tokenizer.pad_token_id)
     patches = get_token_indices_patches(
         token_to_patch, [ex1, ex2], inp, input_prompts, mt.tokenizer
     )
