@@ -204,8 +204,20 @@ def patch_ex1_into_ex2(
 
     answers = decode_tokens(mt.tokenizer, preds_tokens)
     if decoder_input_ids is None:
-        assert ex1["prediction"].startswith(answers[0]), ex1["id"]
-        assert ex2["prediction"].startswith(answers[1]), ex2["id"]
+        if not ex1["prediction"].startswith(answers[0]):
+            raise Exception(
+                "In ex={}, the generated token is='{}' which does not start "
+                "with the expected answer '{}'. The inputs were: {}".format(
+                    ex1["id"], ex1["prediction"], answers[0], inp
+                )
+            )
+        if not ex2["prediction"].startswith(answers[1]):
+            raise Exception(
+                "In ex={}, the generated token is='{}' which does not start "
+                "with the expected answer '{}'. The inputs were: {}".format(
+                    ex2["id"], ex2["prediction"], answers[1], inp
+                )
+            )
     patches_results = []
     if kind is None:
         for token_idx_to_patch_from, token_idx_to_patch, ids_stack in patches:
