@@ -183,8 +183,8 @@ def patch_ex1_into_ex2(
             )
             * mt.tokenizer.pad_token_id
         )
-        inp["input_ids"][0, : len(ex1["input_ids"])] = torch.tensor(ex1["input_ids"])
-        inp["input_ids"][1, : len(ex2["input_ids"])] = torch.tensor(ex2["input_ids"])
+        inp["input_ids"][0, -len(ex1["input_ids"]) :] = torch.tensor(ex1["input_ids"])
+        inp["input_ids"][1, -len(ex2["input_ids"]) :] = torch.tensor(ex2["input_ids"])
         inp["attention_mask"] = torch.zeros_like(inp["input_ids"])
         inp["attention_mask"][0][-len(ex1["input_ids"]) :] = 1
         inp["attention_mask"][1][-len(ex2["input_ids"]) :] = 1
@@ -208,14 +208,14 @@ def patch_ex1_into_ex2(
             raise Exception(
                 "In ex={}, the generated token is='{}' which does not start "
                 "with the expected answer '{}'. The inputs were: {}".format(
-                    ex1["id"], ex1["prediction"], answers[0], inp
+                    ex1["id"], answers[0], ex1["prediction"], inp
                 )
             )
         if not ex2["prediction"].startswith(answers[1]):
             raise Exception(
                 "In ex={}, the generated token is='{}' which does not start "
                 "with the expected answer '{}'. The inputs were: {}".format(
-                    ex2["id"], ex2["prediction"], answers[1], inp
+                    ex2["id"], answers[1], ex2["prediction"], inp
                 )
             )
     patches_results = []
