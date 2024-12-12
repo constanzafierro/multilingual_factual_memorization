@@ -15,6 +15,7 @@ from transformers import (
     XGLMForCausalLM,
     MT5ForConditionalGeneration,
     LlamaForCausalLM,
+    Gemma2ForCausalLM,
 )
 
 from dsets import KnownsDataset
@@ -540,7 +541,7 @@ def layername(model, num=-1, kind=None, stack="encoder"):
         return (
             f'{stack}.block.{num}{"" if kind is None else ".layer." + kind_map[kind]}'
         )
-    if isinstance(model, LlamaForCausalLM):
+    if isinstance(model, LlamaForCausalLM) or isinstance(model, Gemma2ForCausalLM):
         kind_to_layer = {
             "embed": "model.embed_tokens",
             "layers": "model.layers",
