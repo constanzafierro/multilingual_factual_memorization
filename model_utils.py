@@ -33,7 +33,10 @@ def load_model_and_tok(model_name_or_path, model_name):
     num_layers = (
         config.num_layers if hasattr(config, "num_layers") else config.num_hidden_layers
     )
-    tokenizer = AutoTokenizer.from_pretrained(model_name_or_path)
+    extra_tok_args = {}
+    if "eurollm" in model_name_or_path.lower():
+        extra_tok_args = {"legacy": False}
+    tokenizer = AutoTokenizer.from_pretrained(model_name_or_path, **extra_tok_args)
     return ModelAndTokenizer(
         model_name=model_name,
         model=model,
