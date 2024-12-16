@@ -84,12 +84,10 @@ def trace_with_patch(
     if noise:
         # Logits is a tuple with length max_new_tokens and each element is a
         # tensor of shape (batch_size, config.vocab_size).
-        if use_logits:
-            probs = outputs_exp.logits[-1][1:, :].mean(dim=0)[answers_t]
-        else:
-            probs = torch.softmax(outputs_exp.logits[-1][1:, :], dim=1).mean(dim=0)[
-                answers_t
-            ]
+        logits = outputs_exp.logits[-1][1:, :].mean(dim=0)[answers_t]
+        probs = torch.softmax(outputs_exp.logits[-1][1:, :], dim=1).mean(dim=0)[
+            answers_t
+        ]
     else:
         probs_first_token = torch.softmax(outputs_exp.logits[0][1:, :], dim=1)
         sort_ind = np.argsort(-probs_first_token.detach().cpu().numpy(), axis=-1)
@@ -123,7 +121,7 @@ def trace_with_patch(
         )
         return probs, all_traced
 
-    return probs
+    return probs, logits
 
 
 def trace_important_states(
@@ -139,7 +137,7 @@ def trace_important_states(
     use_logits=False,
 ):
     """Copy of the function in causal_trace.ipynb"""
-    table = []
+    table_probs, tabe_logits = [], []
     tokens_to_patch = ntoks
     if not ids_stack:
         ids_stack = [("input_ids", "encoder"), ("decoder_input_ids", "decoder")]
@@ -163,11 +161,12 @@ def trace_important_states(
                 )
                 row.append(r)
             if noise:
-                table.append(torch.stack(row))
+                table_probs.append(torch.stack([p for p, _ in row]))
+                tabe_logits.append(torch.stack([logits for _, logits in row]))
             else:
                 for i in range(len(row[0])):
-                    table.append(torch.stack([r[i] for r in row]))
-    return torch.stack(table) if noise else table
+                    table_probs.append(torch.stack([r[i] for r in row]))
+    return torch.stack(table_probs), torch.stack(tabe_logits) if noise else table_probs
 
 
 def trace_important_states_swap(
@@ -215,7 +214,7 @@ def trace_important_window(
 ):
     """Copy of the function in causal_trace.ipynb"""
     tokens_to_patch = ntoks
-    table = []
+    table_probs, tabe_logits = [], []
     for ids_key, stack in [("input_ids", "encoder"), ("decoder_input_ids", "decoder")]:
         if ids_key not in inp:
             continue
@@ -244,5 +243,6 @@ def trace_important_window(
                     use_logits=use_logits,
                 )
                 row.append(r.detach().cpu())
-            table.append(torch.stack(row))
-    return torch.stack(table)
+            table_probs.append(torch.stack([p for p, _ in row]))
+            tabe_logits.append(torch.stack([logits for _, logits in row]))
+    return torch.stack(table_probs), torch.stack(tabe_logits)

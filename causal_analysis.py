@@ -72,7 +72,7 @@ def calculate_hidden_flow(
         mt.model, inp, [], answer_t, e_range, noise=noise, use_logits=use_logits
     ).item()
     if not kind:
-        differences = trace_important_states(
+        prob_diffs, logit_diffs = trace_important_states(
             mt.model,
             mt.num_layers,
             inp,
@@ -82,7 +82,7 @@ def calculate_hidden_flow(
             use_logits=use_logits,
         )
     else:
-        differences = trace_important_window(
+        prob_diffs, logit_diffs = trace_important_window(
             mt.model,
             mt.num_layers,
             inp,
@@ -94,7 +94,8 @@ def calculate_hidden_flow(
             low_score=low_score,
             use_logits=use_logits,
         )
-    differences = differences.detach().cpu()
+    prob_diffs = prob_diffs.detach().cpu()
+    logit_diffs = logit_diffs.detach().cpu()
     input_ids = inp["input_ids"][0]
     if decoder_input_ids is not None:
         input_ids = np.concatenate(
@@ -104,7 +105,8 @@ def calculate_hidden_flow(
             )
         )
     return dict(
-        scores=differences,
+        prob_diffs=prob_diffs,
+        logit_diffs=logit_diffs,
         low_score=low_score,
         high_score=base_score,
         input_ids=input_ids,
