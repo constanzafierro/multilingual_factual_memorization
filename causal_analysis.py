@@ -105,7 +105,7 @@ def calculate_hidden_flow(
             )
         )
     return dict(
-        prob_diffs=prob_diffs,
+        scores=prob_diffs,
         logit_diffs=logit_diffs,
         low_score=low_score,
         high_score=base_score,
