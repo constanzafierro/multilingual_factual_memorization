@@ -68,9 +68,10 @@ def calculate_hidden_flow(
             )
     e_range = find_token_range(mt.tokenizer, inp["input_ids"][0], subject, prompt)
     # Add noise and make a forward pass.
-    low_score = trace_with_patch(
+    low_score, low_score_logit = trace_with_patch(
         mt.model, inp, [], answer_t, e_range, noise=noise, use_logits=use_logits
-    ).item()
+    )
+    low_score, low_score_logit = low_score.item(), low_score_logit.item()
     if not kind:
         prob_diffs, logit_diffs = trace_important_states(
             mt.model,
@@ -108,6 +109,7 @@ def calculate_hidden_flow(
         scores=prob_diffs,
         logit_diffs=logit_diffs,
         low_score=low_score,
+        low_score_logit=low_score_logit,
         high_score=base_score,
         input_ids=input_ids,
         input_tokens=decode_tokens(mt.tokenizer, input_ids),
