@@ -242,7 +242,7 @@ def trace_important_window(
                     noise=noise,
                     use_logits=use_logits,
                 )
-                row.append(r.detach().cpu())
+                row.append((r[0].detach().cpu(), r[1].detach().cpu()))
             table_probs.append(torch.stack([p for p, _ in row]))
             tabe_logits.append(torch.stack([logits for _, logits in row]))
     return torch.stack(table_probs), torch.stack(tabe_logits)
