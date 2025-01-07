@@ -137,7 +137,7 @@ def trace_important_states(
     use_logits=False,
 ):
     """Copy of the function in causal_trace.ipynb"""
-    table_probs, tabe_logits = [], []
+    table_probs, table_logits = [], []
     tokens_to_patch = ntoks
     if not ids_stack:
         ids_stack = [("input_ids", "encoder"), ("decoder_input_ids", "decoder")]
@@ -162,11 +162,11 @@ def trace_important_states(
                 row.append(r)
             if noise:
                 table_probs.append(torch.stack([p for p, _ in row]))
-                tabe_logits.append(torch.stack([logits for _, logits in row]))
+                table_logits.append(torch.stack([logits for _, logits in row]))
             else:
                 for i in range(len(row[0])):
                     table_probs.append(torch.stack([r[i] for r in row]))
-    return torch.stack(table_probs), torch.stack(tabe_logits) if noise else table_probs
+    return torch.stack(table_probs), torch.stack(table_logits) if noise else table_probs
 
 
 def trace_important_states_swap(
@@ -224,7 +224,7 @@ def trace_important_window(
             row = []
             for layer in range(0, num_layers):
                 if kind == "cross_attn" and stack != "decoder":
-                    row.append(torch.tensor(low_score))
+                    row.append((torch.tensor(low_score[0]), torch.tensor(low_score[1])))
                     continue
                 layerlist = [
                     (tnum, layername(model, stack=stack, num=L, kind=kind))

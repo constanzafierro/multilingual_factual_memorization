@@ -80,7 +80,6 @@ def calculate_hidden_flow(
             e_range,
             answer_t,
             noise=noise,
-            use_logits=use_logits,
         )
     else:
         prob_diffs, logit_diffs = trace_important_window(
@@ -92,8 +91,7 @@ def calculate_hidden_flow(
             noise=noise,
             window=window,
             kind=kind,
-            low_score=low_score,
-            use_logits=use_logits,
+            low_score=(low_score, low_score_logit),
         )
     prob_diffs = prob_diffs.detach().cpu()
     logit_diffs = logit_diffs.detach().cpu()
@@ -417,7 +415,6 @@ def plot_hidden_flow(
     kind,
     noise_level,
     patch_k_layers,
-    use_logits,
     override=False,
 ):
     unk_in_query_inference = set()
@@ -439,7 +436,6 @@ def plot_hidden_flow(
                 kind=kind,
                 window=patch_k_layers,
                 expected_ans=ex["prediction"],
-                use_logits=use_logits,
             )
             if not result:
                 unk_in_query_inference.add(f"{ex_id}{kind}.npz")
@@ -472,8 +468,6 @@ def main(args):
         data_id += f"_window={args.patch_k_layers}"
     if args.override_noise_level is not None:
         data_id += f"_noise={args.override_noise_level}"
-    if args.use_logits:
-        data_id += "_logits"
     cache_dir = os.path.join(args.output_folder, args.model_name, data_id)
 
     cache_hidden_flow = os.path.join(cache_dir, "cache_hidden_flow")
