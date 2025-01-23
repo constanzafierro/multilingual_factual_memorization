@@ -57,7 +57,8 @@ def set_block_attn_hooks(model, attn_layer_to_blockage):
                 "attention_mask" if "attention_mask" in kwargs else "mask"
             )
             causal_attention = (
-                kwargs[attention_mask_key].shape[-2]
+                kwargs[attention_mask_key] is None
+                or kwargs[attention_mask_key].shape[-2]
                 == kwargs[attention_mask_key].shape[-1]
             )
             # The mask argument is only used in the first layer in mt5,
