@@ -9,7 +9,7 @@ import pandas as pd
 import torch
 import wandb
 from tqdm import tqdm
-from transformers import MT5ForConditionalGeneration
+from transformers import MT5ForConditionalGeneration, LlamaForCausalLM
 
 from dataset.data_utils import find_token_range, get_dataset_name, get_memorized_dataset
 from model_utils import load_model_and_tok
@@ -57,8 +57,7 @@ def set_block_attn_hooks(model, attn_layer_to_blockage):
                 "attention_mask" if "attention_mask" in kwargs else "mask"
             )
             causal_attention = (
-                kwargs[attention_mask_key] is None
-                or kwargs[attention_mask_key].shape[-2]
+                kwargs[attention_mask_key].shape[-2]
                 == kwargs[attention_mask_key].shape[-1]
             )
             # The mask argument is only used in the first layer in mt5,
@@ -349,7 +348,11 @@ def main(args):
         if ex["decoder_input_ids"] is not None:
             decoder_input_ids = torch.tensor([ex["decoder_input_ids"]]).to(device)
             inp = {**inp, "decoder_input_ids": decoder_input_ids}
-
+        if isinstance(mt.model, LlamaForCausalLM):
+            inp["input_ids"] = torch.zeros(1, len(ex["input_ids"])).to(device)
+            inp["input_ids"][0, 1:] = ex["input_ids"]
+            inp["attention_mask"] = torch.ones_like(inp["input_ids"])
+            inp["attention_mask"][0, 0] = 0
         subject_range = find_token_range(
             mt.tokenizer, inp["input_ids"][0], subject, input_prompt
         )
