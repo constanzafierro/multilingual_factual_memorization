@@ -349,7 +349,7 @@ def main(args):
             decoder_input_ids = torch.tensor([ex["decoder_input_ids"]]).to(device)
             inp = {**inp, "decoder_input_ids": decoder_input_ids}
         if isinstance(mt.model, LlamaForCausalLM):
-            inp["input_ids"] = torch.zeros(1, len(ex["input_ids"])).to(device)
+            inp["input_ids"] = torch.zeros(1, len(ex["input_ids"]) + 1).to(device)
             inp["input_ids"][0, 1:] = torch.tensor(ex["input_ids"]).to(device)
             inp["attention_mask"] = torch.ones_like(inp["input_ids"])
             inp["attention_mask"][0, 0] = 0
