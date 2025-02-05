@@ -546,6 +546,7 @@ def layername(model, num=-1, kind=None, stack="encoder"):
             "embed": "model.embed_tokens",
             "layers": "model.layers",
             "lm_head": "lm_head",
+            "lm_norm": "model.norm",
         }
         if kind in kind_to_layer:
             return kind_to_layer[kind]
