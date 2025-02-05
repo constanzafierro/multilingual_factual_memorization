@@ -197,7 +197,15 @@ def plot_averages(
         _plot_averages(savepdf, vmin_vmax=vmin_vmax)
 
 
-def agg_causal_analysis_results(tokenizer, ds, cache_output_dir, kind, missing_ids):
+def agg_causal_analysis_results(
+    tokenizer,
+    ds,
+    cache_output_dir,
+    kind,
+    missing_ids,
+    scores_key="scores",
+    low_score_key="low_score",
+):
     tok_special_ids = set(tokenizer.all_special_ids)
     has_bos = tokenizer("some long text here")["input_ids"][0] in tok_special_ids
     has_eos = tokenizer("some long text here")["input_ids"][-1] in tok_special_ids
@@ -219,10 +227,10 @@ def agg_causal_analysis_results(tokenizer, ds, cache_output_dir, kind, missing_i
         )
         decoder_input_ids = ex["decoder_input_ids"]
         input_ids = numpy_result["input_ids"]
-        encoder_scores = numpy_result["scores"]
+        encoder_scores = numpy_result[scores_key]
         if decoder_input_ids:
-            encoder_scores = numpy_result["scores"][: -len(decoder_input_ids)]
-            decoder_scores = numpy_result["scores"][len(encoder_scores) :]
+            encoder_scores = numpy_result[scores_key][: -len(decoder_input_ids)]
+            decoder_scores = numpy_result[scores_key][len(encoder_scores) :]
             decoder_input_ids = input_ids[len(encoder_scores) :]
             input_ids = input_ids[: len(encoder_scores)]
         assert input_ids_match(ex, numpy_result), f"{ex['id']}_{kind}"
@@ -264,8 +272,8 @@ def agg_causal_analysis_results(tokenizer, ds, cache_output_dir, kind, missing_i
                     ex_scores["dec_mask_token"].append(decoder_scores[i])
                 else:
                     ex_scores["dec"].append(decoder_scores[i])
-        ex_scores["last_token"].append(numpy_result["scores"][-1])
-        ex_scores["low_score"].append(numpy_result["low_score"])
+        ex_scores["last_token"].append(numpy_result[scores_key][-1])
+        ex_scores["low_score"].append(numpy_result[low_score_key])
         ex_scores["high_score"].append(numpy_result["high_score"])
         all_scores.append(ex_scores)
     return all_scores
@@ -336,23 +344,33 @@ def plot_average_trace_heatmap(
     use_vmin_vmax_from_folder=None,
     missing_ids=None,
 ):
-    all_scores = agg_causal_analysis_results(
-        tokenizer, ds, cache_output_dir, kind, missing_ids
-    )
-    averaged_scores = compute_averages(all_scores)
-    names_and_counts = list(
-        zip(averaged_scores["agg_tokens_keys"], averaged_scores["counts"])
-    )
+    for key, scores_key, low_score_key in [
+        ("", "scores", "low_score"),
+        ("_logits", "logit_diffs", "low_score_logit"),
+    ]:
+        all_scores = agg_causal_analysis_results(
+            tokenizer,
+            ds,
+            cache_output_dir,
+            kind,
+            missing_ids,
+            scores_key,
+            low_score_key,
+        )
+        averaged_scores = compute_averages(all_scores)
+        names_and_counts = list(
+            zip(averaged_scores["agg_tokens_keys"], averaged_scores["counts"])
+        )
 
-    np.savez(
-        os.path.join(pdf_output_dir, f"avg_data_{kind}.npz"),
-        **{
-            "names_and_counts": names_and_counts,
-            "model_name": model_name,
-            "kind": kind,
-            **averaged_scores,
-        },
-    )
+        np.savez(
+            os.path.join(pdf_output_dir, f"avg_data{key}_{kind}.npz"),
+            **{
+                "names_and_counts": names_and_counts,
+                "model_name": model_name,
+                "kind": kind,
+                **averaged_scores,
+            },
+        )
 
     vmin_max = None
     if use_vmin_vmax_from_folder is not None:
