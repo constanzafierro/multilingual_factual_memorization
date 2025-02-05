@@ -205,12 +205,12 @@ def get_output_dir(args):
     return output_folder
 
 
-def get_block_indices(model_name, subject_indices, inp):
+def get_block_indices(model_name, subject_indices, inp, from_token=0):
     def get_block_config(
         block_from, block_indices, layer, total_layers, stack="encoder", kind="attn"
     ):
         layers_to_block = range(
-            max(0, layer - args.patch_k_layers // 2),
+            max(from_token, layer - args.patch_k_layers // 2),
             min(total_layers, layer - (-args.patch_k_layers // 2)),
         )
         return {
@@ -348,6 +348,7 @@ def main(args):
         if ex["decoder_input_ids"] is not None:
             decoder_input_ids = torch.tensor([ex["decoder_input_ids"]]).to(device)
             inp = {**inp, "decoder_input_ids": decoder_input_ids}
+        from_token = 0
         if isinstance(mt.model, LlamaForCausalLM):
             inp["input_ids"] = torch.zeros(
                 1, len(ex["input_ids"]) + 1, dtype=inp["input_ids"].dtype
@@ -355,18 +356,21 @@ def main(args):
             inp["input_ids"][0, 1:] = torch.tensor(ex["input_ids"]).to(device)
             inp["attention_mask"] = torch.ones_like(inp["input_ids"])
             inp["attention_mask"][0, 0] = 0
+            from_token = 1
         subject_range = find_token_range(
             mt.tokenizer, inp["input_ids"][0], subject, input_prompt
         )
         subject_indices = list(range(subject_range[0], subject_range[1]))
         is_subject_position_zero = input_prompt.startswith(subject)
+        indices_to_block = get_block_indices(
+            args.model_name, subject_indices, inp, from_token
+        )
 
         answer_t, base_score = [d[0] for d in predict_from_input(mt.model, inp)]
         base_score = base_score.cpu().item()
         [answer] = decode_tokens(mt.tokenizer, [answer_t])
         assert ex["prediction"].startswith(answer), ex["id"]
 
-        indices_to_block = get_block_indices(args.model_name, subject_indices, inp)
         if not indices_to_block:
             run_metrics["skipped_examples"] += 1
             continue
