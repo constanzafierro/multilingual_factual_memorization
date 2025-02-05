@@ -8,7 +8,12 @@ import pandas as pd
 import torch
 import wandb
 from tqdm import tqdm
-from transformers import GPT2LMHeadModel, MT5ForConditionalGeneration, XGLMForCausalLM
+from transformers import (
+    GPT2LMHeadModel,
+    MT5ForConditionalGeneration,
+    XGLMForCausalLM,
+    LlamaForCausalLM,
+)
 
 from dataset.data_utils import find_token_range, get_dataset_name, get_memorized_dataset
 from model_utils import load_model_and_tok
@@ -17,7 +22,12 @@ from third_party.rome.util.nethook import get_module
 
 
 def get_hidden_state_from_output(model, output, tok_index, output_type):
-    if type(model) in {XGLMForCausalLM, GPT2LMHeadModel, MT5ForConditionalGeneration}:
+    if type(model) in {
+        XGLMForCausalLM,
+        GPT2LMHeadModel,
+        MT5ForConditionalGeneration,
+        LlamaForCausalLM,
+    }:
         if not output_type.startswith("mlp"):
             # The first position of the output tuple contains the hidden
             output = output[0]
