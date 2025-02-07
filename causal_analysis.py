@@ -555,6 +555,8 @@ def main(args):
         if hasattr(mt.model, "decoder")
         else [None, "mlp", "attn"]
     )
+    if args.only_module is not None:
+        modules = [args.only_module]
     failed_ids = set()
     for kind in modules:
         print("Computing for", kind)
@@ -623,6 +625,7 @@ if __name__ == "__main__":
     parser.add_argument("--keep_only_trivial", action="store_true")
     parser.add_argument("--resample_trivial", action="store_true")
     parser.add_argument("--use_vmin_vmax_from_folder", type=str, default=None)
+    parser.add_argument("--only_module", type=str, default=None)
     args = parser.parse_args()
     if not args.model_name:
         args.model_name = args.model_name_or_path.replace("/", "__")
