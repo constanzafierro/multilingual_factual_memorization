@@ -502,6 +502,7 @@ def layername(model, num=-1, kind=None, stack="encoder"):
             "embed": "transformer.wte",
             "layers": "transformer.h",
             "lm_head": "lm_head",
+            "lm_norm": "transformer.ln_f",
         }
         if kind in kind_to_layer:
             return kind_to_layer[kind]
