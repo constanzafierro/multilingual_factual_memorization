@@ -16,7 +16,7 @@ from model_utils import load_model_and_tok
 from third_party.rome.experiments.causal_trace import (
     decode_tokens,
     layername,
-    predict_from_input,
+    generate_from_input,
 )
 from third_party.rome.util.nethook import get_module
 
@@ -173,13 +173,15 @@ def trace_with_attn_blockage(
         block_attn_hooks, output_edit_hooks = set_block_attn_hooks(model, block_config)
 
         # get prediction
-        outputs_exp = model(**inp)
+        outputs_exp = model.generate(
+            **inp, max_new_tokens=1, output_logits=True, return_dict_in_generate=True
+        )
 
         # remove hooks
         remove_wrapper(model, block_attn_hooks)
         remove_hooks(output_edit_hooks)
 
-    probs = torch.softmax(outputs_exp.logits[0, -1, :], dim=0)[answers_t]
+    probs = torch.softmax(outputs_exp.logits[-1][0, :], dim=0)[answers_t]
 
     return probs
 
@@ -368,7 +370,7 @@ def main(args):
             args.model_name, subject_indices, inp, from_token
         )
 
-        answer_t, base_score = [d[0] for d in predict_from_input(mt.model, inp)]
+        answer_t, base_score = [d[0] for d in generate_from_input(mt.model, inp)]
         base_score = base_score.cpu().item()
         [answer] = decode_tokens(mt.tokenizer, [answer_t])
         assert ex["prediction"].startswith(answer), ex["id"]

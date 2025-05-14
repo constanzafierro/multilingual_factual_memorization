@@ -714,6 +714,17 @@ def predict_from_input(model, inp, entropy=False):
     return preds, p
 
 
+def generate_from_input(model, inp, entropy=False):
+    out = model.generate(
+        **inp, max_new_tokens=1, output_logits=True, return_dict_in_generate=True
+    )["logits"][-1]
+    probs = torch.softmax(out, dim=1)
+    p, preds = torch.max(probs, dim=1)
+    if entropy:
+        return preds, p, -torch.sum(probs * torch.log(probs + 1e-10), dim=-1)
+    return preds, p
+
+
 def collect_embedding_std(mt, subjects, seq2seq=False, subjects_from_ds=None):
     cache_filename = None
     if mt.model_name and subjects_from_ds:
