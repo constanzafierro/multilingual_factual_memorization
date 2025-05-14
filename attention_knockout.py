@@ -9,7 +9,7 @@ import pandas as pd
 import torch
 import wandb
 from tqdm import tqdm
-from transformers import MT5ForConditionalGeneration, LlamaForCausalLM
+from transformers import MT5ForConditionalGeneration, LlamaForCausalLM, GPT2LMHeadModel
 
 from dataset.data_utils import find_token_range, get_dataset_name, get_memorized_dataset
 from model_utils import load_model_and_tok
@@ -349,7 +349,9 @@ def main(args):
             decoder_input_ids = torch.tensor([ex["decoder_input_ids"]]).to(device)
             inp = {**inp, "decoder_input_ids": decoder_input_ids}
         from_token = 0
-        if isinstance(mt.model, LlamaForCausalLM):
+        if isinstance(mt.model, LlamaForCausalLM) or isinstance(
+            mt.model, GPT2LMHeadModel
+        ):
             inp["input_ids"] = torch.zeros(
                 1, len(ex["input_ids"]) + 1, dtype=inp["input_ids"].dtype
             ).to(device)
