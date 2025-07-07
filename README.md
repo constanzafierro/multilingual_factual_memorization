@@ -1,6 +1,7 @@
 # Crosslingual Factual Memorization
 
-Code for the paper ["How Do Multilingual Language Models Remember? Investigating Multilingual Factual Recall Mechanisms"](https://arxiv.org/abs/2410.14387)
+Code for the paper ["How Do Multilingual Language Models Remember Facts?
+"](https://arxiv.org/abs/2410.14387)
 
 ## Data
 - https://github.com/coastalcph/mpararel augmented with aliases (see `dataset/get_aliases.py`)
